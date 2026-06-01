@@ -1,0 +1,531 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── AUTH ───────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  agent
+  org_admin
+  operator
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  phone        String?
+  passwordHash String
+  role         UserRole @default(agent)
+  avatar       String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  agent          Agent?
+  orgMemberships OrgMember[]
+  sessions       Session[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── AGENT ──────────────────────────────────────────────────────────────────
+
+enum AgentStatus {
+  active
+  suspended
+  inactive
+}
+
+enum EducationLevel {
+  none
+  primary
+  secondary
+  tertiary
+}
+
+model Agent {
+  id          String         @id @default(cuid())
+  userId      String         @unique
+  gender      String?
+  age         Int?
+  location    String?
+  district    String?
+  education   EducationLevel?
+  skills      String[]       @default([])
+  bio         String?
+  aiProfile   Json?
+  aiProfileAt DateTime?
+  status      AgentStatus    @default(active)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  user         User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enrollments  CohortEnrollment[]
+  assignments  OpportunityAssignment[]
+  workEpisodes WorkEpisode[]
+  incomeLedger IncomeLedger[]
+}
+
+// ─── ORGANIZATION ────────────────────────────────────────────────────────────
+
+enum OrgType {
+  ngo
+  school
+  government
+  foundation
+  accelerator
+  other
+}
+
+enum SubscriptionTier {
+  free
+  cohort_pack
+  partner
+}
+
+model Organization {
+  id               String           @id @default(cuid())
+  name             String
+  type             OrgType          @default(ngo)
+  email            String?
+  phone            String?
+  address          String?
+  country          String           @default("")
+  logoUrl          String?
+  subscriptionTier SubscriptionTier @default(free)
+  stripeCustomerId String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  members       OrgMember[]
+  cohorts       Cohort[]
+  opportunities Opportunity[]
+  merchants     Merchant[]
+  subscriptions OrgSubscription[]
+  reports       ImpactReport[]
+}
+
+model OrgMember {
+  id        String   @id @default(cuid())
+  orgId     String
+  userId    String
+  role      String   @default("admin")
+  createdAt DateTime @default(now())
+
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, userId])
+}
+
+enum SubscriptionStatus {
+  active
+  cancelled
+  past_due
+}
+
+model OrgSubscription {
+  id                    String             @id @default(cuid())
+  orgId                 String
+  tier                  SubscriptionTier
+  priceUsd              Float
+  stripeSubscriptionId  String?
+  stripePaymentIntentId String?
+  status                SubscriptionStatus @default(active)
+  startedAt             DateTime           @default(now())
+  endsAt                DateTime?
+  createdAt             DateTime           @default(now())
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+}
+
+// ─── COHORT ──────────────────────────────────────────────────────────────────
+
+enum CohortStatus {
+  planning
+  active
+  completed
+  archived
+}
+
+model Cohort {
+  id            String       @id @default(cuid())
+  orgId         String
+  name          String
+  description   String?
+  goalAgents    Int          @default(50)
+  goalEpisodes  Int          @default(500)
+  goalIncome    Int          @default(5000000)
+  status        CohortStatus @default(planning)
+  startDate     DateTime?
+  endDate       DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  org          Organization       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  enrollments  CohortEnrollment[]
+  workEpisodes WorkEpisode[]
+  reports      ImpactReport[]
+}
+
+enum EnrollmentStatus {
+  invited
+  enrolled
+  active
+  completed
+  dropped
+}
+
+model CohortEnrollment {
+  id         String           @id @default(cuid())
+  cohortId   String
+  agentId    String
+  status     EnrollmentStatus @default(enrolled)
+  enrolledAt DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  cohort Cohort @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  agent  Agent  @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([cohortId, agentId])
+}
+
+// ─── MERCHANT (records only — no auth in MVP) ────────────────────────────────
+
+enum MerchantCategory {
+  shop
+  restaurant
+  pharmacy
+  salon
+  market
+  retail
+  other
+}
+
+enum MerchantStatus {
+  active
+  churned
+  inactive
+}
+
+model Merchant {
+  id        String          @id @default(cuid())
+  orgId     String
+  name      String
+  phone     String
+  address   String?
+  category  MerchantCategory @default(retail)
+  district  String?
+  status    MerchantStatus  @default(active)
+  notes     String?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  org           Organization         @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  workEpisodes  WorkEpisode[]
+  confirmations MerchantConfirmation[]
+}
+
+// ─── OPPORTUNITY ─────────────────────────────────────────────────────────────
+
+enum ServiceType {
+  merchant_outreach
+  catalog_creation
+  business_profiling
+  photography
+  survey
+  digital_presence
+  other
+}
+
+enum OpportunityStatus {
+  open
+  filled
+  closed
+  cancelled
+}
+
+model Opportunity {
+  id             String            @id @default(cuid())
+  orgId          String
+  title          String
+  description    String
+  serviceType    ServiceType
+  amount         Int
+  skillsRequired String[]          @default([])
+  location       String?
+  district       String?
+  maxAssignments Int               @default(1)
+  status         OpportunityStatus @default(open)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  org          Organization            @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  assignments  OpportunityAssignment[]
+  workEpisodes WorkEpisode[]
+}
+
+enum AssignmentStatus {
+  assigned
+  accepted
+  declined
+  expired
+}
+
+model OpportunityAssignment {
+  id            String           @id @default(cuid())
+  opportunityId String
+  agentId       String
+  aiMatchScore  Float            @default(0)
+  aiMatchReason String?
+  status        AssignmentStatus @default(assigned)
+  assignedAt    DateTime         @default(now())
+  respondedAt   DateTime?
+
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  agent       Agent       @relation(fields: [agentId], references: [id], onDelete: Cascade)
+}
+
+// ─── WORK EPISODE ENGINE ─────────────────────────────────────────────────────
+// Canonical status machine:
+// planned → assigned → accepted → in_progress → delivered
+// → proof_uploaded → merchant_confirmed → paid → verified
+// Side exits: cancelled | disputed
+
+enum EpisodeStatus {
+  planned
+  assigned
+  accepted
+  in_progress
+  delivered
+  proof_uploaded
+  merchant_confirmed
+  paid
+  verified
+  cancelled
+  disputed
+}
+
+model WorkEpisode {
+  id            String        @id @default(cuid())
+  opportunityId String?
+  agentId       String
+  merchantId    String?
+  cohortId      String?
+  orgId         String?
+  title         String
+  serviceType   ServiceType
+  amount        Int
+  status        EpisodeStatus @default(planned)
+  notes         String?
+  startedAt     DateTime?
+  deliveredAt   DateTime?
+  verifiedAt    DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  agent        Agent                 @relation(fields: [agentId], references: [id])
+  merchant     Merchant?             @relation(fields: [merchantId], references: [id])
+  cohort       Cohort?               @relation(fields: [cohortId], references: [id])
+  opportunity  Opportunity?          @relation(fields: [opportunityId], references: [id])
+  proofItems   ProofItem[]
+  confirmation MerchantConfirmation?
+  payment      Payment?
+  incomeLedger IncomeLedger?
+}
+
+// ─── PROOF-OF-WORK ────────────────────────────────────────────────────────────
+// proofStatus ladder: self_reported → proof_uploaded → merchant_confirmed → program_verified
+// AI auto-triages ALL proof items (autonomous execution)
+
+enum ProofFileType {
+  photo
+  video
+  pdf
+  screenshot
+  audio
+}
+
+enum ProofAiStatus {
+  pending
+  accepted
+  rejected
+  needs_more_info
+}
+
+model ProofItem {
+  id              String        @id @default(cuid())
+  workEpisodeId   String
+  fileUrl         String
+  fileType        ProofFileType
+  fileName        String?
+  fileSizeBytes   Int?
+  aiStatus        ProofAiStatus @default(pending)
+  aiConfidence    Float?
+  aiNotes         String?
+  aiReviewedAt    DateTime?
+  humanReviewed   Boolean       @default(false)
+  humanDecision   String?
+  humanReviewedAt DateTime?
+  createdAt       DateTime      @default(now())
+
+  workEpisode WorkEpisode @relation(fields: [workEpisodeId], references: [id], onDelete: Cascade)
+}
+
+// ─── MERCHANT CONFIRMATION ────────────────────────────────────────────────────
+
+model MerchantConfirmation {
+  id            String    @id @default(cuid())
+  workEpisodeId String    @unique
+  merchantId    String
+  confirmed     Boolean   @default(false)
+  rating        Int?
+  feedback      String?
+  confirmedAt   DateTime?
+  createdAt     DateTime  @default(now())
+
+  workEpisode WorkEpisode @relation(fields: [workEpisodeId], references: [id], onDelete: Cascade)
+  merchant    Merchant    @relation(fields: [merchantId], references: [id])
+}
+
+// ─── PAYMENT — merchant pays agent directly, platform is SaaS only ───────────
+
+enum PaymentMethod {
+  mobile_money
+  bank
+  cash
+}
+
+enum ProofStatus {
+  self_reported
+  proof_uploaded
+  merchant_confirmed
+  program_verified
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  workEpisodeId String        @unique
+  amount        Int
+  method        PaymentMethod
+  proofUrl      String?
+  proofStatus   ProofStatus   @default(self_reported)
+  reference     String?
+  paidAt        DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  workEpisode WorkEpisode @relation(fields: [workEpisodeId], references: [id], onDelete: Cascade)
+}
+
+// ─── INCOME LEDGER ────────────────────────────────────────────────────────────
+
+model IncomeLedger {
+  id                String      @id @default(cuid())
+  agentId           String
+  workEpisodeId     String      @unique
+  amount            Int
+  verificationLevel ProofStatus @default(self_reported)
+  periodMonth       Int
+  periodYear        Int
+  createdAt         DateTime    @default(now())
+
+  agent       Agent       @relation(fields: [agentId], references: [id])
+  workEpisode WorkEpisode @relation(fields: [workEpisodeId], references: [id], onDelete: Cascade)
+}
+
+// ─── AI WORKFLOW LOG (canonical single schema) ───────────────────────────────
+
+enum AiWorkflowType {
+  proof_verification
+  opportunity_matching
+  career_profile
+  program_monitoring
+  fraud_detection
+  report_generation
+  agent_recommendation
+  risk_assessment
+}
+
+model AiWorkflowLog {
+  id                 String          @id @default(cuid())
+  workflowType       AiWorkflowType
+  entityId           String?
+  entityType         String?
+  success            Boolean         @default(true)
+  inputSummary       String?
+  outputSummary      String?
+  modelUsed          String          @default("gemini-2.5-flash")
+  tokensUsed         Int?
+  latencyMs          Int?
+  autonomousDecision Boolean         @default(true)
+  createdAt          DateTime        @default(now())
+}
+
+// ─── IMPACT REPORTS ───────────────────────────────────────────────────────────
+
+enum ReportType {
+  weekly
+  monthly
+  cohort
+  impact
+  donor
+  board
+}
+
+model ImpactReport {
+  id          String     @id @default(cuid())
+  orgId       String
+  cohortId    String?
+  reportType  ReportType
+  title       String
+  content     Json
+  aiGenerated Boolean    @default(true)
+  generatedAt DateTime   @default(now())
+  createdAt   DateTime   @default(now())
+
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  cohort Cohort?      @relation(fields: [cohortId], references: [id])
+}
+
+// ─── FRAUD FLAGS ──────────────────────────────────────────────────────────────
+
+enum FraudSeverity {
+  low
+  medium
+  high
+}
+
+enum FraudFlagType {
+  duplicate
+  suspicious_proof
+  unusual_volume
+  location_mismatch
+  none
+}
+
+model FraudFlag {
+  id          String        @id @default(cuid())
+  entityId    String
+  entityType  String
+  flagType    FraudFlagType
+  severity    FraudSeverity @default(medium)
+  description String
+  aiGenerated Boolean       @default(true)
+  resolved    Boolean       @default(false)
+  resolvedAt  DateTime?
+  resolution  String?
+  createdAt   DateTime      @default(now())
+}
