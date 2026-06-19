@@ -65,7 +65,9 @@ export function getWorkEpisodeNextStatus(current: string): string | null {
 }
 
 export function timeAgo(date: Date | string): string {
+  if (!date) return "unknown";
   const d = new Date(date);
+  if (isNaN(d.getTime())) return "unknown";
   const seconds = Math.floor((Date.now() - d.getTime()) / 1000);
   if (seconds < 60) return "just now";
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;

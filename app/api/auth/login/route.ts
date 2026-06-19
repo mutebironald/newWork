@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { db } from "@/lib/firebase";
 import { verifyPassword, createSession } from "@/lib/auth";
 import { cookies } from "next/headers";
 
@@ -11,17 +11,25 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Email and password required" }, { status: 400 });
     }
 
-    const user = await db.user.findUnique({ where: { email } });
-    if (!user) {
+    const userSnapshot = await db
+      .collection("users")
+      .where("email", "==", email.trim().toLowerCase())
+      .limit(1)
+      .get();
+
+    if (userSnapshot.empty) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
+
+    const userDoc = userSnapshot.docs[0];
+    const user = userDoc.data();
 
     const valid = await verifyPassword(password, user.passwordHash);
     if (!valid) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
-    const token = await createSession(user.id);
+    const token = await createSession(userDoc.id);
     const cookieStore = await cookies();
     cookieStore.set("session", token, {
       httpOnly: true,

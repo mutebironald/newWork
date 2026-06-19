@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { db } from "@/lib/firebase";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,38 +13,74 @@ export default async function IncomePage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const ledger = await db.incomeLedger.findMany({
-    include: {
-      agent: { include: { user: true } },
-      workEpisode: { include: { merchant: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const ledgerSnapshot = await db.collection("income_ledger").get();
+  const ledger: any[] = [];
+  for (const doc of ledgerSnapshot.docs) {
+    const entry = doc.data();
 
-  const totalIncome = ledger.reduce((s, l) => s + l.amount, 0);
+    // Fetch agent profile
+    const agentDoc = await db.collection("agent_profiles").doc(entry.agentId).get();
+    let agent = null;
+    if (agentDoc.exists) {
+      const agentData = agentDoc.data();
+      const userDoc = await db.collection("users").doc(agentData.userId).get();
+      const user = userDoc.exists ? userDoc.data() : { name: "Unknown" };
+      agent = { ...agentData, id: entry.agentId, user };
+    } else {
+      agent = { user: { name: "Unknown" } };
+    }
+
+    // Fetch work episode
+    const epDoc = await db.collection("work_episodes").doc(entry.workEpisodeId).get();
+    let workEpisode = null;
+    if (epDoc.exists) {
+      const epData = epDoc.data();
+      // Fetch merchant
+      let merchant = null;
+      if (epData.merchantId) {
+        const merchantDoc = await db.collection("merchants").doc(epData.merchantId).get();
+        if (merchantDoc.exists) merchant = merchantDoc.data();
+      }
+      workEpisode = { ...epData, id: entry.workEpisodeId, merchant };
+    } else {
+      workEpisode = { title: "Unknown Work Episode" };
+    }
+
+    ledger.push({
+      ...entry,
+      id: doc.id,
+      agent,
+      workEpisode,
+    });
+  }
+
+  // Sort by createdAt desc
+  ledger.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+  const totalIncome = ledger.reduce((s: number, l: any) => s + l.amount, 0);
   const verifiedIncome = ledger
-    .filter((l) => l.verificationLevel !== "self_reported")
-    .reduce((s, l) => s + l.amount, 0);
+    .filter((l: any) => l.verificationLevel !== "self_reported")
+    .reduce((s: number, l: any) => s + l.amount, 0);
   const merchantConfirmedIncome = ledger
-    .filter((l) =>
+    .filter((l: any) =>
       ["merchant_confirmed", "program_verified"].includes(l.verificationLevel)
     )
-    .reduce((s, l) => s + l.amount, 0);
+    .reduce((s: number, l: any) => s + l.amount, 0);
 
   const agentIncomes = Object.entries(
-    ledger.reduce((acc, l) => {
+    ledger.reduce((acc: any, l: any) => {
       const key = l.agentId;
-      if (!acc[key]) acc[key] = { name: l.agent.user.name, total: 0, count: 0 };
+      if (!acc[key]) acc[key] = { name: l.agent?.user?.name || "Unknown", total: 0, count: 0 };
       acc[key].total += l.amount;
       acc[key].count += 1;
       return acc;
     }, {} as Record<string, { name: string; total: number; count: number }>)
   )
-    .map(([id, v]) => ({ id, ...v }))
-    .sort((a, b) => b.total - a.total)
+    .map(([id, v]: any) => ({ id, ...v }))
+    .sort((a: any, b: any) => b.total - a.total)
     .slice(0, 10);
 
-  const uniqueAgents = new Set(ledger.map((l) => l.agentId)).size;
+  const uniqueAgents = new Set(ledger.map((l: any) => l.agentId)).size;
   const avgPerAgent = uniqueAgents > 0 ? Math.round(totalIncome / uniqueAgents) : 0;
 
   return (

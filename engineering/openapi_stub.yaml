@@ -1,0 +1,41 @@
+openapi: 3.0.0
+info:
+  title: NewWork MVP API
+  version: 0.1.0
+paths:
+  /api/ai/skill-profile:
+    post:
+      summary: Generate structured skill profile from agent intake
+      responses:
+        '200':
+          description: Skill profile generated
+  /api/ai/service-offers:
+    post:
+      summary: Generate service offer cards
+      responses:
+        '200':
+          description: Service offers generated
+  /api/merchants:
+    post:
+      summary: Create merchant profile
+      responses:
+        '200':
+          description: Merchant created
+  /api/work-episodes:
+    post:
+      summary: Create work episode
+      responses:
+        '200':
+          description: Work episode created
+  /api/payments/create-checkout-session:
+    post:
+      summary: Create Stripe Checkout Session
+      responses:
+        '200':
+          description: Checkout URL returned
+  /api/evidence/xprize-snapshot:
+    get:
+      summary: Export XPRIZE evidence snapshot
+      responses:
+        '200':
+          description: Evidence snapshot returned

@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900" role="img" aria-label="XPRIZE Evidence Dashboard">
+  <rect width="1400" height="900" fill="#F7F3EA"/>
+  <text x="700" y="52" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700" fill="#11263C">XPRIZE Evidence Dashboard</text>
+  <text x="700" y="82" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#53616E">Built to show Business Viability, AI-Native Operations, and Category Impact</text>
+  <rect x="70" y="150" width="370" height="560" rx="16" fill="#FFFFFF" stroke="#C7BDAF" stroke-width="2"/>
+  <text x="255.0" y="185" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#1F2933">Business Viability</text>
+  <text x="255.0" y="214" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#53616E">Users</text>
+  <text x="255.0" y="236" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#53616E">Paid users</text>
+  <text x="255.0" y="258" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#53616E">Stripe revenue</text>
+  <text x="255.0" y="280" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#53616E">Platform revenue</text>
+  <rect x="515" y="150" width="370" height="560" rx="16" fill="#FFFFFF" stroke="#C7BDAF" stroke-width="2"/>
+  <text x="700.0" y="185" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#1F2933">AI-Native Operations</text>
+  <text x="700.0" y="214" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#53616E">AI workflows</text>
+  <text x="700.0" y="236" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#53616E">Skill profiles</text>
+  <text x="700.0" y="258" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#53616E">Offers generated</text>
+  <text x="700.0" y="280" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#53616E">Outreach generated</text>
+  <rect x="960" y="150" width="370" height="560" rx="16" fill="#FFFFFF" stroke="#C7BDAF" stroke-width="2"/>
+  <text x="1145.0" y="185" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#1F2933">Category Impact</text>
+  <text x="1145.0" y="214" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#53616E">Merchants onboarded</text>
+  <text x="1145.0" y="236" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#53616E">Paid work episodes</text>
+  <text x="1145.0" y="258" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#53616E">Proof uploads</text>
+  <text x="1145.0" y="280" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#53616E">Verified work</text>
+  <rect x="105" y="330" width="300" height="55" rx="10" fill="#F7F3EA" stroke="#C7BDAF"/>
+  <text x="127" y="364" font-family="Arial" font-size="16" fill="#53616E">Metric card</text>
+  <rect x="105" y="410" width="300" height="55" rx="10" fill="#F7F3EA" stroke="#C7BDAF"/>
+  <text x="127" y="444" font-family="Arial" font-size="16" fill="#53616E">Metric card</text>
+  <rect x="105" y="490" width="300" height="55" rx="10" fill="#F7F3EA" stroke="#C7BDAF"/>
+  <text x="127" y="524" font-family="Arial" font-size="16" fill="#53616E">Metric card</text>
+  <rect x="550" y="330" width="300" height="55" rx="10" fill="#F7F3EA" stroke="#C7BDAF"/>
+  <text x="572" y="364" font-family="Arial" font-size="16" fill="#53616E">Metric card</text>
+  <rect x="550" y="410" width="300" height="55" rx="10" fill="#F7F3EA" stroke="#C7BDAF"/>
+  <text x="572" y="444" font-family="Arial" font-size="16" fill="#53616E">Metric card</text>
+  <rect x="550" y="490" width="300" height="55" rx="10" fill="#F7F3EA" stroke="#C7BDAF"/>
+  <text x="572" y="524" font-family="Arial" font-size="16" fill="#53616E">Metric card</text>
+  <rect x="995" y="330" width="300" height="55" rx="10" fill="#F7F3EA" stroke="#C7BDAF"/>
+  <text x="1017" y="364" font-family="Arial" font-size="16" fill="#53616E">Metric card</text>
+  <rect x="995" y="410" width="300" height="55" rx="10" fill="#F7F3EA" stroke="#C7BDAF"/>
+  <text x="1017" y="444" font-family="Arial" font-size="16" fill="#53616E">Metric card</text>
+  <rect x="995" y="490" width="300" height="55" rx="10" fill="#F7F3EA" stroke="#C7BDAF"/>
+  <text x="1017" y="524" font-family="Arial" font-size="16" fill="#53616E">Metric card</text>
+</svg>

@@ -1,0 +1,104 @@
+{
+  "agentProfile": {
+    "type": "object",
+    "required": [
+      "agentId",
+      "userId",
+      "skills",
+      "toolsAvailable",
+      "status"
+    ],
+    "properties": {
+      "agentId": {
+        "type": "string"
+      },
+      "userId": {
+        "type": "string"
+      },
+      "location": {
+        "type": "string"
+      },
+      "languages": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "skills": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "toolsAvailable": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "status": {
+        "enum": [
+          "draft",
+          "active",
+          "paused"
+        ]
+      }
+    }
+  },
+  "workEpisode": {
+    "type": "object",
+    "required": [
+      "workEpisodeId",
+      "agentId",
+      "merchantId",
+      "serviceType",
+      "status"
+    ],
+    "properties": {
+      "workEpisodeId": {
+        "type": "string"
+      },
+      "agentId": {
+        "type": "string"
+      },
+      "merchantId": {
+        "type": "string"
+      },
+      "serviceType": {
+        "type": "string"
+      },
+      "amountPaid": {
+        "type": "number"
+      },
+      "currency": {
+        "type": "string"
+      },
+      "paymentStatus": {
+        "enum": [
+          "unpaid",
+          "paid",
+          "disputed",
+          "refunded"
+        ]
+      },
+      "proofStatus": {
+        "enum": [
+          "self_reported",
+          "proof_uploaded",
+          "merchant_confirmed",
+          "program_verified"
+        ]
+      },
+      "status": {
+        "enum": [
+          "planned",
+          "delivered",
+          "paid",
+          "verified",
+          "cancelled",
+          "disputed"
+        ]
+      }
+    }
+  }
+}

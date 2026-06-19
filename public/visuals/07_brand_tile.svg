@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900" role="img" aria-label="NewWork brand tile">
+  <rect width="1400" height="900" fill="#11263C"/>
+  <rect x="110" y="110" width="1180" height="680" rx="36" fill="#F7F3EA" opacity="0.98"/>
+  <text x="700" y="320" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="92" font-weight="700" fill="#11263C">NewWork</text>
+  <text x="700" y="385" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="30" fill="#53616E">Turning skills into paid work</text>
+  <line x1="440" y1="445" x2="960" y2="445" stroke="#C7BDAF" stroke-width="3"/>
+  <text x="700" y="515" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="26" fill="#496B5B">A work creation engine for youth agents and informal merchants</text>
+  <text x="700" y="580" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="21" fill="#53616E">Skill intake · Service offers · Merchant support · Paid work episodes · Proof-of-work</text>
+  
+  <!-- Create Account Button -->
+  <a href="/register" target="_self">
+    <rect x="370" y="650" width="310" height="65" rx="14" fill="#11263C" cursor="pointer"/>
+    <text x="525" y="690" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="bold" fill="#FFFFFF" cursor="pointer">Create an Account</text>
+  </a>
+
+  <!-- Already registered? Login Button -->
+  <a href="/login" target="_self">
+    <rect x="720" y="650" width="310" height="65" rx="14" fill="none" stroke="#C7BDAF" stroke-width="2.5" cursor="pointer"/>
+    <text x="875" y="690" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="bold" fill="#11263C" cursor="pointer">Already registered? Login</text>
+  </a>
+</svg>

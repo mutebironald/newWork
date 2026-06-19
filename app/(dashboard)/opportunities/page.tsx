@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { db } from "@/lib/firebase";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -22,14 +22,59 @@ export default async function OpportunitiesPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const opportunities = await db.opportunity.findMany({
-    include: {
-      org: true,
-      assignments: { include: { agent: { include: { user: true } } } },
-      _count: { select: { workEpisodes: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const snapshot = await db.collection("opportunities").get();
+  const opportunities: any[] = [];
+  for (const doc of snapshot.docs) {
+    const opp = doc.data();
+
+    // Fetch org
+    const orgDoc = await db.collection("organizations").doc(opp.orgId).get();
+    const org = orgDoc.exists ? orgDoc.data() : { name: "Unknown" };
+
+    // Fetch assignments
+    const assignmentsSnapshot = await db
+      .collection("opportunity_assignments")
+      .where("opportunityId", "==", doc.id)
+      .get();
+
+    const assignments: any[] = [];
+    for (const aDoc of assignmentsSnapshot.docs) {
+      const assignment = aDoc.data();
+
+      // Fetch agent
+      const agentDoc = await db.collection("agent_profiles").doc(assignment.agentId).get();
+      if (agentDoc.exists) {
+        const agentData = agentDoc.data();
+        const userDoc = await db.collection("users").doc(agentData.userId).get();
+        const user = userDoc.exists ? userDoc.data() : { name: "Unknown" };
+        assignments.push({
+          ...assignment,
+          id: aDoc.id,
+          agent: { ...agentData, id: assignment.agentId, user },
+        });
+      }
+    }
+
+    // Fetch count of workEpisodes started
+    const episodesSnapshot = await db
+      .collection("work_episodes")
+      .where("opportunityId", "==", doc.id)
+      .get();
+    const workEpisodesCount = episodesSnapshot.size;
+
+    opportunities.push({
+      ...opp,
+      id: doc.id,
+      org,
+      assignments,
+      _count: {
+        workEpisodes: workEpisodesCount,
+      },
+    });
+  }
+
+  // Sort by createdAt desc
+  opportunities.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-6">

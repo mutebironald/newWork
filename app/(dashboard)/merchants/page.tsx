@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { db } from "@/lib/firebase";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -22,14 +22,46 @@ export default async function MerchantsPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const merchants = await db.merchant.findMany({
-    include: {
-      org: true,
-      workEpisodes: { select: { status: true, amount: true } },
-      confirmations: { select: { confirmed: true, rating: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const merchantsSnapshot = await db.collection("merchants").get();
+  const merchants: any[] = [];
+  for (const doc of merchantsSnapshot.docs) {
+    const merchant = doc.data();
+
+    // Fetch org
+    const orgDoc = await db.collection("organizations").doc(merchant.orgId).get();
+    const org = orgDoc.exists ? orgDoc.data() : { name: "Unknown" };
+
+    // Fetch workEpisodes
+    const episodesSnapshot = await db
+      .collection("work_episodes")
+      .where("merchantId", "==", doc.id)
+      .get();
+    const workEpisodes = episodesSnapshot.docs.map((d: any) => {
+      const data = d.data();
+      return { status: data.status, amount: data.amount };
+    });
+
+    // Fetch confirmations
+    const confirmationsSnapshot = await db
+      .collection("merchant_confirmations")
+      .where("merchantId", "==", doc.id)
+      .get();
+    const confirmations = confirmationsSnapshot.docs.map((d: any) => {
+      const data = d.data();
+      return { confirmed: data.confirmed, rating: data.rating };
+    });
+
+    merchants.push({
+      ...merchant,
+      id: doc.id,
+      org,
+      workEpisodes,
+      confirmations,
+    });
+  }
+
+  // Sort by createdAt desc
+  merchants.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-6">
@@ -49,14 +81,14 @@ export default async function MerchantsPage() {
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
         {merchants.map((merchant) => {
-          const completedEps = merchant.workEpisodes.filter((e) =>
+          const completedEps = merchant.workEpisodes.filter((e: any) =>
             ["verified", "paid", "merchant_confirmed"].includes(e.status)
           ).length;
-          const confirmedCount = merchant.confirmations.filter((c) => c.confirmed).length;
-          const ratings = merchant.confirmations.filter((c) => c.rating);
+          const confirmedCount = merchant.confirmations.filter((c: any) => c.confirmed).length;
+          const ratings = merchant.confirmations.filter((c: any) => c.rating);
           const avgRating =
             ratings.length > 0
-              ? (ratings.reduce((s, c) => s + (c.rating || 0), 0) / ratings.length).toFixed(1)
+              ? (ratings.reduce((s: number, c: any) => s + (c.rating || 0), 0) / ratings.length).toFixed(1)
               : null;
           const status = getStatusBadge(merchant.status);
           const catColor = categoryColors[merchant.category] || categoryColors.other;

@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { db } from "@/lib/firebase";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { StatCard } from "@/components/ui/stat-card";
@@ -24,39 +24,84 @@ export default async function OverviewPage() {
   if (!session) redirect("/login");
 
   const [
-    totalAgents,
-    totalMerchants,
-    totalEpisodes,
-    verifiedEpisodes,
-    merchantConfirmed,
-    totalIncome,
-    recentEpisodes,
-    aiLogs,
-    openOpportunities,
-    fraudFlags,
+    agentsSnapshot,
+    merchantsSnapshot,
+    episodesSnapshot,
+    verifiedSnapshot,
+    confirmedSnapshot,
+    ledgerSnapshot,
+    recentEpisodesSnapshot,
+    aiLogsSnapshot,
+    openSnapshot,
+    flagsSnapshot,
+    autonomousSnapshot,
   ] = await Promise.all([
-    db.agent.count({ where: { status: "active" } }),
-    db.merchant.count({ where: { status: "active" } }),
-    db.workEpisode.count(),
-    db.workEpisode.count({ where: { status: "verified" } }),
-    db.workEpisode.count({ where: { status: "merchant_confirmed" } }),
-    db.incomeLedger.aggregate({ _sum: { amount: true } }),
-    db.workEpisode.findMany({
-      take: 8,
-      orderBy: { createdAt: "desc" },
-      include: {
-        agent: { include: { user: true } },
-        merchant: true,
-      },
-    }),
-    db.aiWorkflowLog.count(),
-    db.opportunity.count({ where: { status: "open" } }),
-    db.fraudFlag.count({ where: { resolved: false } }),
+    db.collection("agent_profiles").where("status", "==", "active").get(),
+    db.collection("merchants").where("status", "==", "active").get(),
+    db.collection("work_episodes").get(),
+    db.collection("work_episodes").where("status", "==", "verified").get(),
+    db.collection("work_episodes").where("status", "==", "merchant_confirmed").get(),
+    db.collection("income_ledger").get(),
+    db.collection("work_episodes").get(),
+    db.collection("ai_workflow_logs").get(),
+    db.collection("opportunities").where("status", "==", "open").get(),
+    db.collection("fraud_flags").where("resolved", "==", false).get(),
+    db.collection("ai_workflow_logs").where("autonomousDecision", "==", true).get(),
   ]);
 
-  const totalIncomeAmt = totalIncome._sum.amount || 0;
-  const autonomousLogs = await db.aiWorkflowLog.count({ where: { autonomousDecision: true } });
+  const totalAgents = agentsSnapshot.size;
+  const totalMerchants = merchantsSnapshot.size;
+  const totalEpisodes = episodesSnapshot.size;
+  const verifiedEpisodes = verifiedSnapshot.size;
+  const merchantConfirmed = confirmedSnapshot.size;
+
+  let totalIncomeAmt = 0;
+  for (const doc of ledgerSnapshot.docs) {
+    totalIncomeAmt += doc.data().amount || 0;
+  }
+
+  const aiLogs = aiLogsSnapshot.size;
+  const openOpportunities = openSnapshot.size;
+  const fraudFlags = flagsSnapshot.size;
+  const autonomousLogs = autonomousSnapshot.size;
   const aiAutonomyRate = aiLogs > 0 ? Math.round((autonomousLogs / aiLogs) * 100) : 0;
+
+  // Build the recentEpisodes array
+  const allEpisodes = recentEpisodesSnapshot.docs.map((doc: any) => ({
+    ...doc.data(),
+    id: doc.id,
+  }));
+  // Sort by createdAt desc
+  allEpisodes.sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+  const selectedEpisodes = allEpisodes.slice(0, 8);
+
+  const recentEpisodes: any[] = [];
+  for (const ep of selectedEpisodes) {
+    // Fetch agent profile
+    const agentDoc = await db.collection("agent_profiles").doc(ep.agentId).get();
+    let agent = null;
+    if (agentDoc.exists) {
+      const agentData = agentDoc.data();
+      const userDoc = await db.collection("users").doc(agentData.userId).get();
+      const user = userDoc.exists ? userDoc.data() : { name: "Unknown" };
+      agent = { ...agentData, id: ep.agentId, user };
+    } else {
+      agent = { user: { name: "Unknown" } };
+    }
+
+    // Fetch merchant
+    let merchant = null;
+    if (ep.merchantId) {
+      const merchantDoc = await db.collection("merchants").doc(ep.merchantId).get();
+      if (merchantDoc.exists) merchant = merchantDoc.data();
+    }
+
+    recentEpisodes.push({
+      ...ep,
+      agent,
+      merchant,
+    });
+  }
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8">

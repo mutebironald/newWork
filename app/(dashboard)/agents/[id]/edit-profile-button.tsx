@@ -24,7 +24,7 @@ export function EditProfileButton({ agent }: AgentUpdateProps) {
     district: agent.district || "",
     location: agent.location || "",
     bio: agent.bio || "",
-    skills: agent.skills.join(", "),
+    skills: (agent.skills || []).join(", "),
   });
 
   async function handleSubmit(e: React.FormEvent) {

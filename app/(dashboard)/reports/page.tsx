@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { db } from "@/lib/firebase";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,13 +22,44 @@ export default async function ReportsPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const [reports, orgs] = await Promise.all([
-    db.impactReport.findMany({
-      include: { org: true, cohort: true },
-      orderBy: { generatedAt: "desc" },
-    }),
-    db.organization.findMany({ select: { id: true, name: true } }),
+  const [reportsSnapshot, orgsSnapshot] = await Promise.all([
+    db.collection("impact_reports").get(),
+    db.collection("organizations").get(),
   ]);
+
+  const orgs = orgsSnapshot.docs.map((doc: any) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      name: data.name,
+    };
+  });
+
+  const reports: any[] = [];
+  for (const doc of reportsSnapshot.docs) {
+    const report = doc.data();
+
+    // Fetch org
+    const orgDoc = await db.collection("organizations").doc(report.orgId).get();
+    const org = orgDoc.exists ? orgDoc.data() : { name: "Unknown" };
+
+    // Fetch cohort
+    let cohort = null;
+    if (report.cohortId) {
+      const cohortDoc = await db.collection("cohorts").doc(report.cohortId).get();
+      if (cohortDoc.exists) cohort = cohortDoc.data();
+    }
+
+    reports.push({
+      ...report,
+      id: doc.id,
+      org,
+      cohort,
+    });
+  }
+
+  // Sort by generatedAt desc
+  reports.sort((a, b) => new Date(b.generatedAt || 0).getTime() - new Date(a.generatedAt || 0).getTime());
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-6">

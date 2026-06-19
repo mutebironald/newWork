@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900" role="img" aria-label="AI-Native Operations Loop">
+  <rect width="1400" height="900" fill="#F7F3EA"/>
+  <text x="700" y="52" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700" fill="#11263C">AI-Native Operations Loop</text>
+  <text x="700" y="82" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="16" fill="#53616E">AI executes operational work, not just idea generation</text>
+  <rect x="100" y="150" width="260" height="130" rx="16" fill="#FFFFFF" stroke="#C7BDAF" stroke-width="2"/>
+  <text x="230.0" y="185" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#1F2933">Skill Profiler</text>
+  <text x="230.0" y="214" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#53616E">Structured skill profile</text>
+  <rect x="450" y="150" width="260" height="130" rx="16" fill="#FFFFFF" stroke="#C7BDAF" stroke-width="2"/>
+  <text x="580.0" y="185" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#1F2933">Offer Generator</text>
+  <text x="580.0" y="214" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#53616E">Merchant services</text>
+  <rect x="800" y="150" width="260" height="130" rx="16" fill="#FFFFFF" stroke="#C7BDAF" stroke-width="2"/>
+  <text x="930.0" y="185" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#1F2933">Outreach Assistant</text>
+  <text x="930.0" y="214" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#53616E">WhatsApp scripts</text>
+  <rect x="100" y="420" width="260" height="130" rx="16" fill="#FFFFFF" stroke="#C7BDAF" stroke-width="2"/>
+  <text x="230.0" y="455" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#1F2933">Extraction Layer</text>
+  <text x="230.0" y="484" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#53616E">Receipts and notes</text>
+  <rect x="450" y="420" width="260" height="130" rx="16" fill="#FFFFFF" stroke="#C7BDAF" stroke-width="2"/>
+  <text x="580.0" y="455" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#1F2933">Merchant Output</text>
+  <text x="580.0" y="484" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#53616E">Summaries and catalogs</text>
+  <rect x="800" y="420" width="260" height="130" rx="16" fill="#FFFFFF" stroke="#C7BDAF" stroke-width="2"/>
+  <text x="930.0" y="455" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#1F2933">Evidence Analyst</text>
+  <text x="930.0" y="484" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#53616E">Cohort reports</text>
+  <rect x="1110" y="285" width="210" height="150" rx="16" fill="#6E3F4A" stroke="#C7BDAF" stroke-width="2"/>
+  <text x="1215.0" y="320" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#1F2933">Safety Checker</text>
+  <text x="1215.0" y="349" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#53616E">No income guarantees</text>
+  <text x="1215.0" y="371" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#53616E">No legal or tax advice</text>
+  <text x="1215.0" y="393" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#53616E">Review risky output</text>
+  <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#11263C"/></marker></defs>
+  <line x1="360" y1="215" x2="450" y2="215" stroke="#11263C" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#11263C"/></marker></defs>
+  <line x1="710" y1="215" x2="800" y2="215" stroke="#11263C" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#11263C"/></marker></defs>
+  <line x1="930" y1="280" x2="1110" y2="330" stroke="#11263C" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#11263C"/></marker></defs>
+  <line x1="230" y1="280" x2="230" y2="420" stroke="#11263C" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#11263C"/></marker></defs>
+  <line x1="360" y1="485" x2="450" y2="485" stroke="#11263C" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#11263C"/></marker></defs>
+  <line x1="710" y1="485" x2="800" y2="485" stroke="#11263C" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#11263C"/></marker></defs>
+  <line x1="930" y1="485" x2="1110" y2="390" stroke="#11263C" stroke-width="2.5" marker-end="url(#arrow)"/>
+</svg>

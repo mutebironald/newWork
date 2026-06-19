@@ -2,13 +2,13 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { Logo } from "@/components/ui/logo";
 import {
   LayoutDashboard,
   Users,
   Store,
   Briefcase,
   ListChecks,
-  Zap,
   BarChart3,
   FileText,
   Trophy,
@@ -55,9 +55,7 @@ export function Sidebar({ user }: SidebarProps) {
   return (
     <div className="flex h-full w-64 flex-col bg-gray-950 text-white">
       <div className="flex h-16 items-center gap-3 px-5 border-b border-gray-800">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 shrink-0">
-          <Zap className="h-4 w-4 text-white" />
-        </div>
+        <Logo className="h-8 w-8 shrink-0" />
         <div>
           <p className="text-sm font-bold tracking-tight">NewWork</p>
           <p className="text-xs text-gray-400">AI Workforce Platform</p>

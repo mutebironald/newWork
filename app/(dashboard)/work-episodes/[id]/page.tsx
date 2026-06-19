@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { db } from "@/lib/firebase";
 import { getSession } from "@/lib/auth";
 import { redirect, notFound } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +13,7 @@ import {
 } from "@/lib/utils";
 import { EpisodeStatusAdvancer } from "./status-advancer";
 import { DisputeControls } from "./dispute-controls";
+import { ProofUploader } from "./proof-uploader";
 import { Bot, CheckCircle2, Star, FileText, Wallet } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -26,20 +27,78 @@ export default async function WorkEpisodeDetailPage({
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const ep = await db.workEpisode.findUnique({
-    where: { id },
-    include: {
-      agent: { include: { user: true } },
-      merchant: true,
-      opportunity: true,
-      cohort: true,
-      proofItems: { orderBy: { createdAt: "desc" } },
-      confirmation: true,
-      payment: true,
-    },
-  });
+  const episodeDoc = await db.collection("work_episodes").doc(id).get();
+  if (!episodeDoc.exists) notFound();
+  const epData = episodeDoc.data();
 
-  if (!ep) notFound();
+  // Fetch agent profile
+  const agentDoc = await db.collection("agent_profiles").doc(epData.agentId).get();
+  let agent = null;
+  if (agentDoc.exists) {
+    const agentData = agentDoc.data();
+    const userDoc = await db.collection("users").doc(agentData.userId).get();
+    const user = userDoc.exists ? userDoc.data() : { name: "Unknown" };
+    agent = { ...agentData, id: epData.agentId, user };
+  } else {
+    agent = { user: { name: "Unknown" } };
+  }
+
+  // Fetch merchant
+  let merchant = null;
+  if (epData.merchantId) {
+    const merchantDoc = await db.collection("merchants").doc(epData.merchantId).get();
+    if (merchantDoc.exists) merchant = merchantDoc.data();
+  }
+
+  // Fetch opportunity
+  let opportunity = null;
+  if (epData.opportunityId) {
+    const oppDoc = await db.collection("opportunities").doc(epData.opportunityId).get();
+    if (oppDoc.exists) opportunity = oppDoc.data();
+  }
+
+  // Fetch cohort
+  let cohort = null;
+  if (epData.cohortId) {
+    const cohortDoc = await db.collection("cohorts").doc(epData.cohortId).get();
+    if (cohortDoc.exists) cohort = cohortDoc.data();
+  }
+
+  // Fetch proofItems
+  const proofsSnapshot = await db
+    .collection("proof_items")
+    .where("workEpisodeId", "==", id)
+    .get();
+  const proofItems = proofsSnapshot.docs.map((d: any) => ({ ...d.data(), id: d.id }));
+  proofItems.sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+  // Fetch confirmation
+  const confSnapshot = await db
+    .collection("merchant_confirmations")
+    .where("workEpisodeId", "==", id)
+    .limit(1)
+    .get();
+  const confirmation = !confSnapshot.empty ? confSnapshot.docs[0].data() : null;
+
+  // Fetch payment
+  const paymentSnapshot = await db
+    .collection("payments")
+    .where("workEpisodeId", "==", id)
+    .limit(1)
+    .get();
+  const payment = !paymentSnapshot.empty ? paymentSnapshot.docs[0].data() : null;
+
+  const ep = {
+    ...epData,
+    id,
+    agent,
+    merchant,
+    opportunity,
+    cohort,
+    proofItems,
+    confirmation,
+    payment,
+  };
 
   const status = getStatusBadge(ep.status);
   const nextStatus = getWorkEpisodeNextStatus(ep.status);
@@ -101,7 +160,7 @@ export default async function WorkEpisodeDetailPage({
         <StatCard title="Episode Amount" value={formatLocal(ep.amount)} />
         <StatCard
           title="Proof Items"
-          value={`${ep.proofItems.filter((p) => p.aiStatus === "accepted").length}/${ep.proofItems.length}`}
+          value={`${ep.proofItems.filter((p: any) => p.aiStatus === "accepted").length}/${ep.proofItems.length}`}
           subtitle="AI accepted/total"
         />
         <StatCard
@@ -117,6 +176,12 @@ export default async function WorkEpisodeDetailPage({
         <EpisodeStatusAdvancer episodeId={ep.id} currentStatus={ep.status} nextStatus={nextStatus} />
       )}
 
+      {((session.role === "agent" && session.agentId === ep.agentId) || 
+        ["operator", "org_admin"].includes(session.role)) && 
+        !["paid", "verified", "cancelled"].includes(ep.status) && (
+        <ProofUploader episodeId={ep.id} />
+      )}
+
       <DisputeControls episodeId={ep.id} currentStatus={ep.status} />
 
       {/* Proof items */}
@@ -129,7 +194,7 @@ export default async function WorkEpisodeDetailPage({
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            {ep.proofItems.map((proof) => {
+            {ep.proofItems.map((proof: any) => {
               const aiStatusColor =
                 proof.aiStatus === "accepted"
                   ? "text-green-700 bg-green-50 border-green-200"

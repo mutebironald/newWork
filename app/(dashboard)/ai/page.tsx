@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { db } from "@/lib/firebase";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +7,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { formatLocal, timeAgo, calculateAiAutonomyRate } from "@/lib/utils";
 import { RunAiButton } from "./run-ai-button";
 import { Bot, CheckCircle2, AlertTriangle, Clock, Zap, Brain } from "lucide-react";
+import Image from "next/image";
 
 export const dynamic = "force-dynamic";
 
@@ -25,32 +26,63 @@ export default async function AiEnginePage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const [logs, fraudFlags, pendingProofs] = await Promise.all([
-    db.aiWorkflowLog.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 50,
-    }),
-    db.fraudFlag.findMany({
-      where: { resolved: false },
-      orderBy: { createdAt: "desc" },
-    }),
-    db.proofItem.findMany({
-      where: { aiStatus: "pending" },
-      include: { workEpisode: { include: { agent: { include: { user: true } } } } },
-    }),
+  const [logsSnapshot, fraudSnapshot, proofsSnapshot] = await Promise.all([
+    db.collection("ai_workflow_logs").get(),
+    db.collection("fraud_flags").where("resolved", "==", false).get(),
+    db.collection("proof_items").where("aiStatus", "==", "pending").get(),
   ]);
+
+  let logs = logsSnapshot.docs.map((doc: any) => ({ ...doc.data(), id: doc.id }));
+  logs.sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+  logs = logs.slice(0, 50);
+
+  let fraudFlags = fraudSnapshot.docs.map((doc: any) => ({ ...doc.data(), id: doc.id }));
+  fraudFlags.sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+  const pendingProofs: any[] = [];
+  for (const doc of proofsSnapshot.docs) {
+    const proof = doc.data();
+
+    // Fetch work episode
+    const epDoc = await db.collection("work_episodes").doc(proof.workEpisodeId).get();
+    if (epDoc.exists) {
+      const epData = epDoc.data();
+
+      // Fetch agent profile
+      const agentDoc = await db.collection("agent_profiles").doc(epData.agentId).get();
+      let agent = null;
+      if (agentDoc.exists) {
+        const agentData = agentDoc.data();
+        const userDoc = await db.collection("users").doc(agentData.userId).get();
+        const user = userDoc.exists ? userDoc.data() : { name: "Unknown" };
+        agent = { ...agentData, id: epData.agentId, user };
+      } else {
+        agent = { user: { name: "Unknown" } };
+      }
+
+      pendingProofs.push({
+        ...proof,
+        id: doc.id,
+        workEpisode: {
+          ...epData,
+          id: proof.workEpisodeId,
+          agent,
+        }
+      });
+    }
+  }
 
   const autonomyRate = calculateAiAutonomyRate(logs);
   const totalLogs = logs.length;
-  const successRate = totalLogs > 0 ? logs.filter((l) => l.success).length / totalLogs : 0;
+  const successRate = totalLogs > 0 ? logs.filter((l: any) => l.success).length / totalLogs : 0;
   const avgLatency =
     totalLogs > 0
-      ? Math.round(logs.reduce((s, l) => s + (l.latencyMs || 0), 0) / totalLogs)
+      ? Math.round(logs.reduce((s: number, l: any) => s + (l.latencyMs || 0), 0) / totalLogs)
       : 0;
-  const totalTokens = logs.reduce((s, l) => s + (l.tokensUsed || 0), 0);
+  const totalTokens = logs.reduce((s: number, l: any) => s + (l.tokensUsed || 0), 0);
 
   const workflowCounts = logs.reduce(
-    (acc, l) => ({ ...acc, [l.workflowType]: (acc[l.workflowType] || 0) + 1 }),
+    (acc: any, l: any) => ({ ...acc, [l.workflowType]: (acc[l.workflowType] || 0) + 1 }),
     {} as Record<string, number>
   );
 
@@ -78,6 +110,18 @@ export default async function AiEnginePage() {
           </p>
         </div>
         <RunAiButton />
+      </div>
+
+      {/* AI-Native Operations Loop diagram */}
+      <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
+        <Image
+          src={`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/visuals/04_ai_native_operations_loop.svg`}
+          alt="AI-Native Operations Loop — how AI runs NewWork's back-office"
+          width={1400}
+          height={900}
+          className="w-full h-auto"
+          priority
+        />
       </div>
 
       {/* AI metrics */}
@@ -186,9 +230,9 @@ export default async function AiEnginePage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {Object.entries(workflowCounts)
-              .sort(([, a], [, b]) => b - a)
-              .map(([type, count]) => {
-                const max = Math.max(...Object.values(workflowCounts));
+              .sort((a: any, b: any) => b[1] - a[1])
+              .map(([type, count]: any) => {
+                const max = Math.max(...(Object.values(workflowCounts) as number[]));
                 return (
                   <div key={type}>
                     <div className="flex justify-between text-sm mb-1">
@@ -229,7 +273,7 @@ export default async function AiEnginePage() {
               </div>
             ) : (
               <div className="divide-y divide-gray-100">
-                {fraudFlags.slice(0, 5).map((flag) => (
+                {fraudFlags.slice(0, 5).map((flag: any) => (
                   <div key={flag.id} className="px-6 py-3">
                     <div className="flex items-center gap-2 mb-1">
                       <Badge
@@ -265,7 +309,7 @@ export default async function AiEnginePage() {
           </CardHeader>
           <CardContent className="p-0">
             <div className="divide-y divide-gray-100">
-              {pendingProofs.map((proof) => (
+              {pendingProofs.map((proof: any) => (
                 <div key={proof.id} className="flex items-center gap-3 px-6 py-3">
                   <div className="flex h-7 w-7 items-center justify-center rounded-full bg-yellow-100 text-yellow-700 text-xs font-bold">
                     {proof.fileType.slice(0, 2).toUpperCase()}
@@ -298,7 +342,7 @@ export default async function AiEnginePage() {
                 No AI workflows logged yet.
               </div>
             )}
-            {logs.slice(0, 15).map((log) => (
+            {logs.slice(0, 15).map((log: any) => (
               <div key={log.id} className="flex items-start gap-3 px-6 py-3 hover:bg-gray-50">
                 <div
                   className={`mt-0.5 h-2 w-2 rounded-full shrink-0 ${
@@ -328,6 +372,34 @@ export default async function AiEnginePage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* System architecture diagram */}
+      <div>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">System Architecture Reference</p>
+        <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
+          <Image
+            src={`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/visuals/01_system_architecture.svg`}
+            alt="NewWork System Architecture — frontend, API, Firestore, Gemini, Stripe"
+            width={1400}
+            height={900}
+            className="w-full h-auto"
+          />
+        </div>
+      </div>
+
+      {/* Core data model */}
+      <div>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Core Data Model</p>
+        <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
+          <Image
+            src={`${process.env.NEXT_PUBLIC_BASE_PATH || ""}/visuals/06_core_data_model.svg`}
+            alt="NewWork Core Data Model — Firestore collections and relationships"
+            width={1400}
+            height={900}
+            className="w-full h-auto"
+          />
+        </div>
+      </div>
     </div>
   );
 }

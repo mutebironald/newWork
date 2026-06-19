@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { db } from "@/lib/firebase";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -12,15 +12,61 @@ export default async function AgentsPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const agents = await db.agent.findMany({
-    include: {
-      user: true,
-      incomeLedger: true,
-      workEpisodes: { select: { status: true } },
-      enrollments: { include: { cohort: { include: { org: true } } } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const agentsSnapshot = await db.collection("agent_profiles").get();
+  const agents: any[] = [];
+  for (const doc of agentsSnapshot.docs) {
+    const agentData = doc.data();
+
+    // Fetch user
+    const userDoc = await db.collection("users").doc(agentData.userId).get();
+    const user = userDoc.exists ? userDoc.data() : { name: "Unknown" };
+
+    // Fetch incomeLedger
+    const ledgerSnapshot = await db
+      .collection("income_ledger")
+      .where("agentId", "==", doc.id)
+      .get();
+    const incomeLedger = ledgerSnapshot.docs.map((d: any) => d.data());
+
+    // Fetch workEpisodes
+    const episodesSnapshot = await db
+      .collection("work_episodes")
+      .where("agentId", "==", doc.id)
+      .get();
+    const workEpisodes = episodesSnapshot.docs.map((d: any) => ({ status: d.data().status }));
+
+    // Fetch enrollments
+    const enrollmentsSnapshot = await db
+      .collection("cohort_enrollments")
+      .where("agentId", "==", doc.id)
+      .get();
+
+    const enrollments: any[] = [];
+    for (const eDoc of enrollmentsSnapshot.docs) {
+      const enrollment = eDoc.data();
+      const cohortDoc = await db.collection("cohorts").doc(enrollment.cohortId).get();
+      let cohort = null;
+      if (cohortDoc.exists) {
+        const cohortData = cohortDoc.data();
+        const orgDoc = await db.collection("organizations").doc(cohortData.orgId).get();
+        const org = orgDoc.exists ? orgDoc.data() : { name: "Unknown" };
+        cohort = { ...cohortData, org };
+      }
+      enrollments.push({ ...enrollment, cohort });
+    }
+
+    agents.push({
+      ...agentData,
+      id: doc.id,
+      user,
+      incomeLedger,
+      workEpisodes,
+      enrollments,
+    });
+  }
+
+  // Sort by createdAt desc
+  agents.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-6">
@@ -47,9 +93,9 @@ export default async function AgentsPage() {
         )}
         {agents.map((agent) => {
           const skills: string[] = agent.skills ?? [];
-          const totalIncome = agent.incomeLedger.reduce((s, l) => s + l.amount, 0);
+          const totalIncome = agent.incomeLedger.reduce((s: number, l: any) => s + l.amount, 0);
           const completedEpisodes = agent.workEpisodes.filter(
-            (e) => e.status === "verified" || e.status === "paid"
+            (e: any) => e.status === "verified" || e.status === "paid"
           ).length;
           const aiProfile = agent.aiProfile as { summary?: string } | null;
           const status = getStatusBadge(agent.status);

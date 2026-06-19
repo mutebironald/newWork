@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { db } from "@/lib/firebase";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,19 +13,78 @@ export default async function ProgramsPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const orgs = await db.organization.findMany({
-    include: {
-      members: { include: { user: true } },
-      cohorts: {
-        include: {
-          enrollments: true,
-          workEpisodes: true,
-        },
-      },
-      subscriptions: { where: { status: "active" }, take: 1 },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const orgsSnapshot = await db.collection("organizations").get();
+  const orgs: any[] = [];
+  for (const doc of orgsSnapshot.docs) {
+    const org = doc.data();
+
+    // Fetch members
+    const membersSnapshot = await db
+      .collection("org_members")
+      .where("orgId", "==", doc.id)
+      .get();
+
+    const members: any[] = [];
+    for (const mDoc of membersSnapshot.docs) {
+      const member = mDoc.data();
+      const userDoc = await db.collection("users").doc(member.userId).get();
+      const user = userDoc.exists ? userDoc.data() : { name: "Unknown" };
+      members.push({ ...member, user });
+    }
+
+    // Fetch cohorts
+    const cohortsSnapshot = await db
+      .collection("cohorts")
+      .where("orgId", "==", doc.id)
+      .get();
+
+    const cohorts: any[] = [];
+    for (const cDoc of cohortsSnapshot.docs) {
+      const cohort = cDoc.data();
+
+      // Fetch enrollments
+      const enrollmentsSnapshot = await db
+        .collection("cohort_enrollments")
+        .where("cohortId", "==", cDoc.id)
+        .get();
+      const enrollments = enrollmentsSnapshot.docs.map((d: any) => d.data());
+
+      // Fetch workEpisodes
+      const episodesSnapshot = await db
+        .collection("work_episodes")
+        .where("cohortId", "==", cDoc.id)
+        .get();
+      const workEpisodes = episodesSnapshot.docs.map((d: any) => d.data());
+
+      cohorts.push({
+        ...cohort,
+        id: cDoc.id,
+        enrollments,
+        workEpisodes,
+      });
+    }
+
+    // Fetch subscriptions (active, limit 1)
+    const subSnapshot = await db
+      .collection("org_subscriptions")
+      .where("orgId", "==", doc.id)
+      .where("status", "==", "active")
+      .limit(1)
+      .get();
+
+    const subscriptions = subSnapshot.docs.map((d: any) => ({ ...d.data(), id: d.id }));
+
+    orgs.push({
+      ...org,
+      id: doc.id,
+      members,
+      cohorts,
+      subscriptions,
+    });
+  }
+
+  // Sort by createdAt desc
+  orgs.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-6">
@@ -98,9 +157,9 @@ export default async function ProgramsPage() {
                   <p className="text-sm text-gray-400">No cohorts yet.</p>
                 ) : (
                   <div className="grid md:grid-cols-2 gap-3">
-                    {org.cohorts.map((cohort) => {
+                    {org.cohorts.map((cohort: any) => {
                       const totalIncome = 0;
-                      const verifiedEps = cohort.workEpisodes.filter((e) =>
+                      const verifiedEps = cohort.workEpisodes.filter((e: any) =>
                         ["verified", "paid", "merchant_confirmed"].includes(e.status)
                       ).length;
                       const status = getStatusBadge(cohort.status);

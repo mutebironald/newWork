@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { db } from "@/lib/firebase";
 import { getSession } from "@/lib/auth";
 import { redirect, notFound } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,26 +16,137 @@ export default async function ProgramDetailPage({ params }: { params: Promise<{ 
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const org = await db.organization.findUnique({
-    where: { id },
-    include: {
-      members: { include: { user: true } },
-      subscriptions: { where: { status: "active" }, take: 1 },
-      cohorts: {
-        include: {
-          enrollments: {
-            include: { agent: { include: { user: true, incomeLedger: true, workEpisodes: true } } },
-          },
-          workEpisodes: {
-            include: { payment: true, confirmation: true },
-            orderBy: { createdAt: "desc" },
-          },
-        },
-      },
-    },
-  });
+  const orgDoc = await db.collection("organizations").doc(id).get();
+  if (!orgDoc.exists) notFound();
+  const orgData = orgDoc.data();
 
-  if (!org) notFound();
+  // Fetch members
+  const membersSnapshot = await db
+    .collection("org_members")
+    .where("orgId", "==", id)
+    .get();
+
+  const members: any[] = [];
+  for (const mDoc of membersSnapshot.docs) {
+    const member = mDoc.data();
+    const userDoc = await db.collection("users").doc(member.userId).get();
+    const user = userDoc.exists ? userDoc.data() : { name: "Unknown" };
+    members.push({ ...member, user });
+  }
+
+  // Fetch subscriptions (active, limit 1)
+  const subSnapshot = await db
+    .collection("org_subscriptions")
+    .where("orgId", "==", id)
+    .where("status", "==", "active")
+    .limit(1)
+    .get();
+  const subscriptions = subSnapshot.docs.map((d: any) => ({ ...d.data(), id: d.id }));
+
+  // Fetch cohorts
+  const cohortsSnapshot = await db
+    .collection("cohorts")
+    .where("orgId", "==", id)
+    .get();
+
+  const cohorts: any[] = [];
+  for (const cDoc of cohortsSnapshot.docs) {
+    const cohort = cDoc.data();
+
+    // Fetch enrollments
+    const enrollmentsSnapshot = await db
+      .collection("cohort_enrollments")
+      .where("cohortId", "==", cDoc.id)
+      .get();
+
+    const enrollments: any[] = [];
+    for (const eDoc of enrollmentsSnapshot.docs) {
+      const enrollment = eDoc.data();
+
+      // Fetch agent profile
+      const agentDoc = await db.collection("agent_profiles").doc(enrollment.agentId).get();
+      if (agentDoc.exists) {
+        const agentData = agentDoc.data();
+        const userDoc = await db.collection("users").doc(agentData.userId).get();
+        const user = userDoc.exists ? userDoc.data() : { name: "Unknown" };
+
+        const ledgerSnapshot = await db
+          .collection("income_ledger")
+          .where("agentId", "==", enrollment.agentId)
+          .get();
+        const incomeLedger = ledgerSnapshot.docs.map((d: any) => d.data());
+
+        const episodesSnapshot = await db
+          .collection("work_episodes")
+          .where("agentId", "==", enrollment.agentId)
+          .get();
+        const workEpisodes = episodesSnapshot.docs.map((d: any) => d.data());
+
+        enrollments.push({
+          ...enrollment,
+          agent: {
+            ...agentData,
+            id: enrollment.agentId,
+            user,
+            incomeLedger,
+            workEpisodes,
+          }
+        });
+      }
+    }
+
+    // Fetch cohort workEpisodes
+    const episodesSnapshot = await db
+      .collection("work_episodes")
+      .where("cohortId", "==", cDoc.id)
+      .get();
+
+    const workEpisodes: any[] = [];
+    for (const epDoc of episodesSnapshot.docs) {
+      const epData = epDoc.data();
+
+      // Fetch payment
+      const paymentSnapshot = await db
+        .collection("payments")
+        .where("workEpisodeId", "==", epDoc.id)
+        .limit(1)
+        .get();
+      const payment = !paymentSnapshot.empty ? paymentSnapshot.docs[0].data() : null;
+
+      // Fetch confirmation
+      const confSnapshot = await db
+        .collection("merchant_confirmations")
+        .where("workEpisodeId", "==", epDoc.id)
+        .limit(1)
+        .get();
+      const confirmation = !confSnapshot.empty ? confSnapshot.docs[0].data() : null;
+
+      workEpisodes.push({
+        ...epData,
+        id: epDoc.id,
+        payment,
+        confirmation,
+      });
+    }
+
+    // Sort workEpisodes by createdAt desc
+    workEpisodes.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+    cohorts.push({
+      ...cohort,
+      id: cDoc.id,
+      enrollments,
+      workEpisodes,
+    });
+  }
+
+  const org = {
+    ...orgData,
+    id,
+    members,
+    subscriptions,
+    cohorts,
+  };
 
   return (
     <div className="p-8 max-w-6xl mx-auto space-y-8">
@@ -67,24 +178,41 @@ export default async function ProgramDetailPage({ params }: { params: Promise<{ 
       </div>
 
       {/* Cohorts */}
+      <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+        <h2 className="text-xl font-bold text-gray-900">Program Cohorts</h2>
+        {["operator", "org_admin"].includes(session.role) && (
+          <Link
+            href={`/programs/${org.id}/cohorts/new`}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors"
+          >
+            Create Cohort
+          </Link>
+        )}
+      </div>
+
       {org.cohorts.length === 0 && (
         <div className="rounded-xl border border-dashed border-gray-300 p-12 text-center text-gray-500">
-          No cohorts yet for this organization.
+          <p className="mb-2">No cohorts yet for this organization.</p>
+          {["operator", "org_admin"].includes(session.role) && (
+            <Link href={`/programs/${org.id}/cohorts/new`} className="text-indigo-600 hover:text-indigo-500 text-sm">
+              Create the first cohort →
+            </Link>
+          )}
         </div>
       )}
 
-      {org.cohorts.map((cohort) => {
+      {org.cohorts.map((cohort: any) => {
         const episodes = cohort.workEpisodes;
-        const verifiedEpisodes = episodes.filter((e) =>
+        const verifiedEpisodes = episodes.filter((e: any) =>
           ["verified", "paid", "merchant_confirmed"].includes(e.status)
         );
-        const merchantConfirmed = episodes.filter((e) => e.confirmation?.confirmed);
+        const merchantConfirmed = episodes.filter((e: any) => e.confirmation?.confirmed);
         const totalIncomeAmt = episodes
-          .filter((e) => e.payment)
-          .reduce((s, e) => s + (e.payment?.amount || 0), 0);
+          .filter((e: any) => e.payment)
+          .reduce((s: number, e: any) => s + (e.payment?.amount || 0), 0);
         const merchantConfirmedIncomeAmt = episodes
-          .filter((e) => e.payment && e.confirmation?.confirmed)
-          .reduce((s, e) => s + (e.payment?.amount || 0), 0);
+          .filter((e: any) => e.payment && e.confirmation?.confirmed)
+          .reduce((s: number, e: any) => s + (e.payment?.amount || 0), 0);
 
         const agentProgress = Math.min((cohort.enrollments.length / cohort.goalAgents) * 100, 100);
         const episodeProgress = Math.min((episodes.length / cohort.goalEpisodes) * 100, 100);
@@ -93,7 +221,7 @@ export default async function ProgramDetailPage({ params }: { params: Promise<{ 
           ? Math.round((verifiedEpisodes.length / episodes.length) * 100)
           : 0;
 
-        const atRiskAgents = cohort.enrollments.filter((e) => {
+        const atRiskAgents = cohort.enrollments.filter((e: any) => {
           const lastEpisode = e.agent.workEpisodes[0];
           return !lastEpisode ||
             new Date(lastEpisode.createdAt) < new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -174,9 +302,9 @@ export default async function ProgramDetailPage({ params }: { params: Promise<{ 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
                   { label: "Self-Reported", count: episodes.length - verifiedEpisodes.length, income: totalIncomeAmt - merchantConfirmedIncomeAmt, color: "border-yellow-300 bg-yellow-50" },
-                  { label: "Proof Uploaded", count: episodes.filter((e) => ["proof_uploaded", "merchant_confirmed", "paid", "verified"].includes(e.status)).length, income: 0, color: "border-blue-300 bg-blue-50" },
-                  { label: "Merchant Confirmed", count: merchantConfirmed.length, income: merchantConfirmedIncomeAmt, color: "border-green-300 bg-green-50" },
-                  { label: "Verified", count: verifiedEpisodes.filter((e) => e.status === "verified").length, income: 0, color: "border-purple-300 bg-purple-50" },
+                  {label: "Proof Uploaded", count: episodes.filter((e: any) => ["proof_uploaded", "merchant_confirmed", "paid", "verified"].includes(e.status)).length, income: 0, color: "border-blue-300 bg-blue-50" },
+                  {label: "Merchant Confirmed", count: merchantConfirmed.length, income: merchantConfirmedIncomeAmt, color: "border-green-300 bg-green-50" },
+                  {label: "Verified", count: verifiedEpisodes.filter((e: any) => e.status === "verified").length, income: 0, color: "border-purple-300 bg-purple-50" },
                 ].map((item) => (
                   <div key={item.label} className={`rounded-lg border p-3 ${item.color}`}>
                     <p className="text-xl font-bold text-gray-900">{item.count}</p>
@@ -196,7 +324,7 @@ export default async function ProgramDetailPage({ params }: { params: Promise<{ 
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {atRiskAgents.slice(0, 6).map((e) => (
+                    {atRiskAgents.slice(0, 6).map((e: any) => (
                       <Link key={e.agentId} href={`/agents/${e.agentId}`}>
                         <span className="inline-flex items-center gap-1 rounded-full bg-yellow-200 border border-yellow-300 px-2.5 py-0.5 text-xs font-medium text-yellow-900 hover:bg-yellow-300 transition-colors">
                           {e.agent.user.name}
@@ -220,10 +348,10 @@ export default async function ProgramDetailPage({ params }: { params: Promise<{ 
                   {cohort.enrollments.length === 0 && (
                     <p className="px-4 py-3 text-sm text-gray-400">No agents enrolled.</p>
                   )}
-                  {cohort.enrollments.map((enrollment) => {
-                    const agentIncome = enrollment.agent.incomeLedger.reduce((s, l) => s + l.amount, 0);
+                  {cohort.enrollments.map((enrollment: any) => {
+                    const agentIncome = enrollment.agent.incomeLedger.reduce((s: number, l: any) => s + l.amount, 0);
                     const agentEps = enrollment.agent.workEpisodes.length;
-                    const isAtRisk = atRiskAgents.some((a) => a.agentId === enrollment.agentId);
+                    const isAtRisk = atRiskAgents.some((a: any) => a.agentId === enrollment.agentId);
                     return (
                       <Link key={enrollment.id} href={`/agents/${enrollment.agentId}`}>
                         <div className={`flex items-center gap-3 px-4 py-3 hover:bg-gray-50 cursor-pointer ${isAtRisk ? "bg-yellow-50" : ""}`}>

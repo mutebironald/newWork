@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { db } from "@/lib/firebase";
 import { getSession } from "@/lib/auth";
 import { redirect, notFound } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +7,9 @@ import { StatCard } from "@/components/ui/stat-card";
 import { getStatusBadge, getVerificationBadge, formatLocal, timeAgo } from "@/lib/utils";
 import { GenerateProfileButton } from "./generate-profile-button";
 import { EditProfileButton } from "./edit-profile-button";
-import { Wallet, Star, Bot, TrendingUp, ShieldCheck, BarChart3 } from "lucide-react";
+import { GenerateOffersButton } from "./generate-offers-button";
+import Link from "next/link";
+import { Wallet, Star, Bot, TrendingUp, ShieldCheck, BarChart3, Sparkles, Briefcase, DollarSign, Wrench, ArrowRight } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -16,24 +18,120 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const agent = await db.agent.findUnique({
-    where: { id },
-    include: {
-      user: true,
-      workEpisodes: {
-        orderBy: { createdAt: "desc" },
-        include: {
-          merchant: true,
-          payment: true,
-          confirmation: { select: { confirmed: true, rating: true } },
-        },
-      },
-      incomeLedger: { orderBy: { createdAt: "desc" } },
-      enrollments: { include: { cohort: { include: { org: true } } } },
-    },
-  });
+  const agentDoc = await db.collection("agent_profiles").doc(id).get();
+  if (!agentDoc.exists) notFound();
+  const agentData = agentDoc.data();
 
-  if (!agent) notFound();
+  // Fetch user
+  const userDoc = await db.collection("users").doc(agentData.userId).get();
+  if (!userDoc.exists) notFound();
+  const user = userDoc.data();
+
+  // Fetch workEpisodes
+  const episodesSnapshot = await db
+    .collection("work_episodes")
+    .where("agentId", "==", id)
+    .get();
+
+  const workEpisodes: any[] = [];
+  for (const epDoc of episodesSnapshot.docs) {
+    const ep = epDoc.data();
+
+    // Fetch merchant
+    let merchant = null;
+    if (ep.merchantId) {
+      const merchantDoc = await db.collection("merchants").doc(ep.merchantId).get();
+      if (merchantDoc.exists) merchant = merchantDoc.data();
+    }
+
+    // Fetch payment
+    const paymentSnapshot = await db
+      .collection("payments")
+      .where("workEpisodeId", "==", epDoc.id)
+      .limit(1)
+      .get();
+    const payment = !paymentSnapshot.empty ? paymentSnapshot.docs[0].data() : null;
+
+    // Fetch confirmation
+    const confSnapshot = await db
+      .collection("merchant_confirmations")
+      .where("workEpisodeId", "==", epDoc.id)
+      .limit(1)
+      .get();
+    const confirmation = !confSnapshot.empty ? confSnapshot.docs[0].data() : null;
+
+    workEpisodes.push({
+      ...ep,
+      id: epDoc.id,
+      merchant,
+      payment,
+      confirmation,
+    });
+  }
+
+  // Sort workEpisodes by createdAt desc
+  workEpisodes.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+  // Fetch incomeLedger
+  const ledgerSnapshot = await db
+    .collection("income_ledger")
+    .where("agentId", "==", id)
+    .get();
+
+  const incomeLedger = ledgerSnapshot.docs.map((d: any) => ({ ...d.data(), id: d.id }));
+  incomeLedger.sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+  // Fetch enrollments
+  const enrollmentsSnapshot = await db
+    .collection("cohort_enrollments")
+    .where("agentId", "==", id)
+    .get();
+
+  const enrollments: any[] = [];
+  for (const eDoc of enrollmentsSnapshot.docs) {
+    const enrollment = eDoc.data();
+    const cohortDoc = await db.collection("cohorts").doc(enrollment.cohortId).get();
+    let cohort = null;
+    if (cohortDoc.exists) {
+      const cohortData = cohortDoc.data();
+      const orgDoc = await db.collection("organizations").doc(cohortData.orgId).get();
+      const org = orgDoc.exists ? orgDoc.data() : { name: "Unknown" };
+      cohort = { ...cohortData, org };
+    }
+    enrollments.push({
+      ...enrollment,
+      id: eDoc.id,
+      cohort,
+    });
+  }
+
+  // Fetch AI-generated service offers
+  const offersSnapshot = await db
+    .collection("service_offers")
+    .where("agentId", "==", id)
+    .get();
+  const serviceOffers = offersSnapshot.docs
+    .map((d: any) => ({ ...d.data(), id: d.id }))
+    .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+    .slice(0, 3);
+
+  // Fetch AI next action
+  const nextActionLogsSnapshot = await db
+    .collection("ai_workflow_logs")
+    .where("entityId", "==", id)
+    .where("workflowType", "==", "agent_recommendation")
+    .get();
+  const nextActionLogs = nextActionLogsSnapshot.docs.map((d: any) => ({ ...d.data(), id: d.id }));
+  nextActionLogs.sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+  const agent = {
+    ...agentData,
+    id,
+    user,
+    workEpisodes,
+    incomeLedger,
+    enrollments,
+  };
 
   const canEdit = session.id === agent.userId || session.role === "operator";
 
@@ -50,28 +148,28 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
   } | null;
 
   // ── Economic metrics ──────────────────────────────────────────────────────
-  const totalIncome = agent.incomeLedger.reduce((s, l) => s + l.amount, 0);
+  const totalIncome = agent.incomeLedger.reduce((s: number, l: any) => s + l.amount, 0);
 
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
   const income30d = agent.incomeLedger
-    .filter((l) => new Date(l.createdAt) >= thirtyDaysAgo)
-    .reduce((s, l) => s + l.amount, 0);
+    .filter((l: any) => new Date(l.createdAt) >= thirtyDaysAgo)
+    .reduce((s: number, l: any) => s + l.amount, 0);
   const income30dPrev = agent.incomeLedger
-    .filter((l) => new Date(l.createdAt) >= sixtyDaysAgo && new Date(l.createdAt) < thirtyDaysAgo)
-    .reduce((s, l) => s + l.amount, 0);
+    .filter((l: any) => new Date(l.createdAt) >= sixtyDaysAgo && new Date(l.createdAt) < thirtyDaysAgo)
+    .reduce((s: number, l: any) => s + l.amount, 0);
   const incomeGrowthPct =
     income30dPrev > 0 ? Math.round(((income30d - income30dPrev) / income30dPrev) * 100) : null;
 
   const verifiedIncome = agent.incomeLedger
-    .filter((l) => l.verificationLevel !== "self_reported")
-    .reduce((s, l) => s + l.amount, 0);
+    .filter((l: any) => l.verificationLevel !== "self_reported")
+    .reduce((s: number, l: any) => s + l.amount, 0);
   const merchantConfirmedIncome = agent.incomeLedger
-    .filter((l) => ["merchant_confirmed", "program_verified"].includes(l.verificationLevel))
-    .reduce((s, l) => s + l.amount, 0);
+    .filter((l: any) => ["merchant_confirmed", "program_verified"].includes(l.verificationLevel))
+    .reduce((s: number, l: any) => s + l.amount, 0);
 
   const completedEpisodes = agent.workEpisodes.filter(
-    (e) => ["verified", "paid", "merchant_confirmed"].includes(e.status)
+    (e: any) => ["verified", "paid", "merchant_confirmed"].includes(e.status)
   );
   const verificationRate =
     agent.workEpisodes.length > 0
@@ -79,10 +177,10 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
       : 0;
 
   const ratings = agent.workEpisodes
-    .map((e) => e.confirmation?.rating)
-    .filter((r): r is number => r !== null && r !== undefined);
+    .map((e: any) => e.confirmation?.rating)
+    .filter((r: any): r is number => r !== null && r !== undefined);
   const avgRating = ratings.length > 0
-    ? (ratings.reduce((s, r) => s + r, 0) / ratings.length).toFixed(1)
+    ? (ratings.reduce((s: number, r: number) => s + r, 0) / ratings.length).toFixed(1)
     : null;
 
   // ── Monthly income breakdown (last 6 months) ─────────────────────────────
@@ -134,7 +232,17 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
           </div>
         </div>
         <div className="flex flex-col gap-2 shrink-0">
-          {canEdit && <EditProfileButton agent={agent} />}
+          {canEdit && (
+            <>
+              <Link
+                href={`/agents/${agent.id}/onboard`}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors shadow-sm"
+              >
+                <Sparkles className="h-4 w-4" /> Onboard Wizard
+              </Link>
+              <EditProfileButton agent={agent} />
+            </>
+          )}
           <GenerateProfileButton agentId={agent.id} />
         </div>
       </div>
@@ -227,7 +335,7 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
             <div>
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Programs Enrolled</p>
               <div className="flex flex-wrap gap-2">
-                {agent.enrollments.map((e) => (
+                {agent.enrollments.map((e: any) => (
                   <div key={e.id} className="rounded-lg bg-indigo-50 border border-indigo-200 px-3 py-1.5">
                     <p className="text-xs font-medium text-indigo-800">{e.cohort.name}</p>
                     <p className="text-xs text-indigo-500">{e.cohort.org.name}</p>
@@ -347,6 +455,86 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
         </Card>
       )}
 
+      {/* AI Work Designer — Service Offers */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Briefcase className="h-4 w-4 text-emerald-600" />
+              <CardTitle>AI Work Designer — Service Offers</CardTitle>
+            </div>
+            {canEdit && <GenerateOffersButton agentId={agent.id} />}
+          </div>
+          <p className="text-xs text-gray-400 mt-1">
+            AI-generated service offers this agent can pitch to informal merchants
+          </p>
+        </CardHeader>
+        <CardContent>
+          {serviceOffers.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-gray-200 p-6 text-center">
+              <Sparkles className="h-8 w-8 text-emerald-400 mx-auto mb-2" />
+              <p className="text-sm font-medium text-gray-700">No service offers yet</p>
+              <p className="text-xs text-gray-400 mt-1">
+                Click &quot;Generate Service Offers&quot; to let AI design practical merchant service offers based on this agent&apos;s skills.
+              </p>
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-3 gap-4">
+              {serviceOffers.map((offer: any) => (
+                <div
+                  key={offer.id}
+                  className={`rounded-xl border p-4 flex flex-col gap-3 ${offer.selected ? "border-emerald-400 bg-emerald-50" : "border-gray-200 bg-white"}`}
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-semibold text-gray-900 leading-tight">{offer.title}</p>
+                      {offer.selected && (
+                        <Badge className="text-emerald-700 bg-emerald-100 border-emerald-200 shrink-0 text-xs">Selected</Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">{offer.merchantType}</p>
+                  </div>
+                  <p className="text-xs text-gray-600">{offer.problemSolved}</p>
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="h-3 w-3 text-green-600" />
+                    <span className="text-xs font-medium text-green-700">
+                      ${offer.priceRange?.min}–${offer.priceRange?.max} {offer.priceRange?.currency}
+                    </span>
+                    <span className={`ml-auto text-xs rounded-full px-2 py-0.5 ${
+                      offer.difficulty === "low"
+                        ? "bg-green-100 text-green-700"
+                        : offer.difficulty === "medium"
+                        ? "bg-yellow-100 text-yellow-700"
+                        : "bg-red-100 text-red-700"
+                    }`}>
+                      {offer.difficulty} difficulty
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 mb-1">First step</p>
+                    <p className="text-xs text-gray-600 italic">{offer.firstStep}</p>
+                  </div>
+                  {(offer.toolsNeeded || []).length > 0 && (
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <Wrench className="h-3 w-3 text-gray-400" />
+                      {(offer.toolsNeeded || []).map((t: string) => (
+                        <span key={t} className="text-xs bg-gray-100 text-gray-600 rounded px-1.5 py-0.5">{t}</span>
+                      ))}
+                    </div>
+                  )}
+                  <Link
+                    href={`/merchants`}
+                    className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-500 font-medium mt-auto"
+                  >
+                    Find a merchant <ArrowRight className="h-3 w-3" />
+                  </Link>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Work history */}
       <Card>
         <CardHeader>
@@ -357,7 +545,7 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
             {agent.workEpisodes.length === 0 && (
               <div className="px-6 py-8 text-center text-sm text-gray-400">No work episodes yet.</div>
             )}
-            {agent.workEpisodes.map((ep) => {
+            {agent.workEpisodes.map((ep: any) => {
               const status = getStatusBadge(ep.status);
               const vl = ep.payment ? getVerificationBadge(ep.payment.proofStatus) : null;
               return (

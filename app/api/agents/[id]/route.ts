@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { db } from "@/lib/firebase";
 import { getSession } from "@/lib/auth";
 
 export async function PATCH(
@@ -13,13 +13,11 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const agent = await db.agent.findUnique({
-      where: { id },
-    });
-
-    if (!agent) {
+    const agentDoc = await db.collection("agent_profiles").doc(id).get();
+    if (!agentDoc.exists) {
       return NextResponse.json({ error: "Agent not found" }, { status: 404 });
     }
+    const agent = agentDoc.data();
 
     const isSelf = session.id === agent.userId;
     const isOperator = session.role === "operator";
@@ -41,14 +39,12 @@ export async function PATCH(
         .filter(Boolean);
     }
 
-    await db.agent.update({
-      where: { id },
-      data: {
-        district: district?.trim() || null,
-        location: location?.trim() || null,
-        bio: bio?.trim() || null,
-        skills: parsedSkills,
-      },
+    await db.collection("agent_profiles").doc(id).update({
+      district: district?.trim() || null,
+      location: location?.trim() || null,
+      bio: bio?.trim() || null,
+      skills: parsedSkills,
+      updatedAt: new Date().toISOString(),
     });
 
     return NextResponse.json({ ok: true });

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { db } from "@/lib/firebase";
 import { verifyProof, matchAgentsToOpportunity, monitorCohortHealth } from "@/lib/ai";
 
 export async function POST() {
@@ -10,47 +10,53 @@ export async function POST() {
   const results: string[] = [];
 
   // 1. Verify all pending proofs
-  const pendingProofs = await db.proofItem.findMany({
-    where: { aiStatus: "pending" },
-    take: 10,
-  });
-  for (const proof of pendingProofs) {
+  const pendingProofsSnapshot = await db
+    .collection("proof_items")
+    .where("aiStatus", "==", "pending")
+    .limit(10)
+    .get();
+
+  for (const doc of pendingProofsSnapshot.docs) {
     try {
-      await verifyProof(proof.id);
-      results.push(`verified:proof:${proof.id}`);
+      await verifyProof(doc.id);
+      results.push(`verified:proof:${doc.id}`);
     } catch (err) {
-      console.error(`AI run-all: proof verification failed for ${proof.id}`, err);
-      results.push(`failed:proof:${proof.id}`);
+      console.error(`AI run-all: proof verification failed for ${doc.id}`, err);
+      results.push(`failed:proof:${doc.id}`);
     }
   }
 
   // 2. Match agents to open opportunities
-  const openOps = await db.opportunity.findMany({
-    where: { status: "open" },
-    take: 5,
-  });
-  for (const op of openOps) {
+  const openOpsSnapshot = await db
+    .collection("opportunities")
+    .where("status", "==", "open")
+    .limit(5)
+    .get();
+
+  for (const doc of openOpsSnapshot.docs) {
     try {
-      await matchAgentsToOpportunity(op.id);
-      results.push(`matched:opportunity:${op.id}`);
+      await matchAgentsToOpportunity(doc.id);
+      results.push(`matched:opportunity:${doc.id}`);
     } catch (err) {
-      console.error(`AI run-all: opportunity matching failed for ${op.id}`, err);
-      results.push(`failed:opportunity:${op.id}`);
+      console.error(`AI run-all: opportunity matching failed for ${doc.id}`, err);
+      results.push(`failed:opportunity:${doc.id}`);
     }
   }
 
   // 3. Monitor active cohorts
-  const activeCohorts = await db.cohort.findMany({
-    where: { status: "active" },
-    take: 5,
-  });
-  for (const cohort of activeCohorts) {
+  const activeCohortsSnapshot = await db
+    .collection("cohorts")
+    .where("status", "==", "active")
+    .limit(5)
+    .get();
+
+  for (const doc of activeCohortsSnapshot.docs) {
     try {
-      await monitorCohortHealth(cohort.id);
-      results.push(`monitored:cohort:${cohort.id}`);
+      await monitorCohortHealth(doc.id);
+      results.push(`monitored:cohort:${doc.id}`);
     } catch (err) {
-      console.error(`AI run-all: cohort monitoring failed for ${cohort.id}`, err);
-      results.push(`failed:cohort:${cohort.id}`);
+      console.error(`AI run-all: cohort monitoring failed for ${doc.id}`, err);
+      results.push(`failed:cohort:${doc.id}`);
     }
   }
 

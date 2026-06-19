@@ -41,3 +41,13 @@ yarn-error.log*
 next-env.d.ts
 
 /app/generated/prisma
+
+.firebase_mock
+.claude
+ai 
+product
+payments
+qa
+FILE_MANIFEST.md
+MASTER_BUILD_SPEC.md
+# design

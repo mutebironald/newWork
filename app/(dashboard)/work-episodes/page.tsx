@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { db } from "@/lib/firebase";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { getStatusBadge, formatLocal, timeAgo } from "@/lib/utils";
 import Link from "next/link";
 import { ListChecks, CheckCircle2, Clock, AlertTriangle } from "lucide-react";
+import { LogEpisodeModal } from "./log-episode-modal";
 
 export const dynamic = "force-dynamic";
 
@@ -19,29 +20,119 @@ export default async function WorkEpisodesPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const episodes = await db.workEpisode.findMany({
-    include: {
-      agent: { include: { user: true } },
-      merchant: true,
-      proofItems: { select: { aiStatus: true, aiConfidence: true } },
-      confirmation: { select: { confirmed: true, rating: true } },
-      payment: { select: { proofStatus: true, amount: true } },
-    },
-    orderBy: { updatedAt: "desc" },
+  const episodesSnapshot = await db.collection("work_episodes").get();
+  const episodes: any[] = [];
+  for (const doc of episodesSnapshot.docs) {
+    const ep = doc.data();
+
+    // Fetch agent profile
+    const agentDoc = await db.collection("agent_profiles").doc(ep.agentId).get();
+    let agent = null;
+    if (agentDoc.exists) {
+      const agentData = agentDoc.data();
+      const userDoc = await db.collection("users").doc(agentData.userId).get();
+      const user = userDoc.exists ? userDoc.data() : { name: "Unknown" };
+      agent = { ...agentData, id: ep.agentId, user };
+    } else {
+      agent = { user: { name: "Unknown" } };
+    }
+
+    // Fetch merchant
+    let merchant = null;
+    if (ep.merchantId) {
+      const merchantDoc = await db.collection("merchants").doc(ep.merchantId).get();
+      if (merchantDoc.exists) merchant = merchantDoc.data();
+    }
+
+    // Fetch proofItems (select: aiStatus, aiConfidence)
+    const proofsSnapshot = await db
+      .collection("proof_items")
+      .where("workEpisodeId", "==", doc.id)
+      .get();
+    const proofItems = proofsSnapshot.docs.map((d: any) => {
+      const data = d.data();
+      return { aiStatus: data.aiStatus, aiConfidence: data.aiConfidence };
+    });
+
+    // Fetch confirmation (select: confirmed, rating)
+    const confSnapshot = await db
+      .collection("merchant_confirmations")
+      .where("workEpisodeId", "==", doc.id)
+      .limit(1)
+      .get();
+    const confirmation = !confSnapshot.empty ? {
+      confirmed: confSnapshot.docs[0].data().confirmed,
+      rating: confSnapshot.docs[0].data().rating,
+    } : null;
+
+    // Fetch payment (select: proofStatus, amount)
+    const paymentSnapshot = await db
+      .collection("payments")
+      .where("workEpisodeId", "==", doc.id)
+      .limit(1)
+      .get();
+    const payment = !paymentSnapshot.empty ? {
+      proofStatus: paymentSnapshot.docs[0].data().proofStatus,
+      amount: paymentSnapshot.docs[0].data().amount,
+    } : null;
+
+    episodes.push({
+      ...ep,
+      id: doc.id,
+      agent,
+      merchant,
+      proofItems,
+      confirmation,
+      payment,
+    });
+  }
+
+  // Sort episodes by updatedAt desc
+  episodes.sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
+
+  const merchantsSnapshot = await db.collection("merchants").get();
+  const merchants = merchantsSnapshot.docs.map((doc: any) => {
+    const data = doc.data();
+    return { id: doc.id, name: data.name };
   });
+  merchants.sort((a: any, b: any) => a.name.localeCompare(b.name));
+
+  const agentsSnapshot = await db.collection("agent_profiles").get();
+  const agents: any[] = [];
+  for (const doc of agentsSnapshot.docs) {
+    const agentData = doc.data();
+    const userDoc = await db.collection("users").doc(agentData.userId).get();
+    const user = userDoc.exists ? userDoc.data() : { name: "Unknown" };
+    agents.push({
+      ...agentData,
+      id: doc.id,
+      user: { name: user.name },
+    });
+  }
+  agents.sort((a: any, b: any) => a.user.name.localeCompare(b.user.name));
+
+  const formattedAgents = agents.map((a: any) => ({ id: a.id, name: a.user.name }));
 
   const counts = STATUS_ORDER.reduce(
-    (acc, s) => ({ ...acc, [s]: episodes.filter((e) => e.status === s).length }),
+    (acc: any, s: any) => ({ ...acc, [s]: episodes.filter((e: any) => e.status === s).length }),
     {} as Record<string, number>
   );
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Work Episode Engine</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          {episodes.length} total · {counts.verified + counts.paid + counts.merchant_confirmed} verified/confirmed
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Work Episode Engine</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {episodes.length} total · {counts.verified + counts.paid + counts.merchant_confirmed} verified/confirmed
+          </p>
+        </div>
+        <LogEpisodeModal
+          agentId={session.agentId}
+          role={session.role}
+          merchants={merchants}
+          agents={formattedAgents}
+        />
       </div>
 
       {/* Status pipeline */}
@@ -66,9 +157,9 @@ export default async function WorkEpisodesPage() {
                 <p className="text-gray-500">No work episodes yet.</p>
               </div>
             )}
-            {episodes.map((ep) => {
+            {episodes.map((ep: any) => {
               const status = getStatusBadge(ep.status);
-              const bestProof = ep.proofItems.sort((a, b) =>
+              const bestProof = ep.proofItems.sort((a: any, b: any) =>
                 (b.aiConfidence || 0) - (a.aiConfidence || 0)
               )[0];
               const hasIssue = ep.status === "disputed" || ep.status === "cancelled";

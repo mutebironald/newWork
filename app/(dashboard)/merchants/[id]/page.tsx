@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { db } from "@/lib/firebase";
 import { getSession } from "@/lib/auth";
 import { redirect, notFound } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { StatCard } from "@/components/ui/stat-card";
 import { getStatusBadge, formatLocal, timeAgo } from "@/lib/utils";
 import Link from "next/link";
-import { ArrowLeft, Store, CheckCircle2, Star, Users, Wallet, AlertCircle } from "lucide-react";
+import { ArrowLeft, Store, CheckCircle2, Star, Users, Wallet, AlertCircle, Wrench } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -15,55 +15,153 @@ export default async function MerchantDetailPage({ params }: { params: Promise<{
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const merchant = await db.merchant.findUnique({
-    where: { id },
-    include: {
-      org: true,
-      workEpisodes: {
-        orderBy: { createdAt: "desc" },
-        include: {
-          agent: { include: { user: true } },
-          proofItems: { select: { aiStatus: true, aiConfidence: true } },
-          payment: { select: { amount: true, method: true, proofStatus: true } },
-          confirmation: true,
-        },
-      },
-      confirmations: {
-        include: { workEpisode: { include: { agent: { include: { user: true } } } } },
-        orderBy: { createdAt: "desc" },
-      },
-    },
-  });
+  const merchantDoc = await db.collection("merchants").doc(id).get();
+  if (!merchantDoc.exists) notFound();
+  const merchantData = merchantDoc.data();
 
-  if (!merchant) notFound();
+  // Fetch org
+  const orgDoc = await db.collection("organizations").doc(merchantData.orgId).get();
+  const org = orgDoc.exists ? orgDoc.data() : { name: "Unknown" };
 
-  const completedEpisodes = merchant.workEpisodes.filter((e) =>
+  // Fetch workEpisodes
+  const episodesSnapshot = await db
+    .collection("work_episodes")
+    .where("merchantId", "==", id)
+    .get();
+
+  const workEpisodes: any[] = [];
+  for (const epDoc of episodesSnapshot.docs) {
+    const ep = epDoc.data();
+
+    // Fetch agent profile
+    const agentDoc = await db.collection("agent_profiles").doc(ep.agentId).get();
+    let agent = null;
+    if (agentDoc.exists) {
+      const agentData = agentDoc.data();
+      const userDoc = await db.collection("users").doc(agentData.userId).get();
+      const user = userDoc.exists ? userDoc.data() : { name: "Unknown" };
+      agent = { ...agentData, id: ep.agentId, user };
+    } else {
+      agent = { user: { name: "Unknown" } };
+    }
+
+    // Fetch proofItems (select aiStatus, aiConfidence)
+    const proofsSnapshot = await db
+      .collection("proof_items")
+      .where("workEpisodeId", "==", epDoc.id)
+      .get();
+    const proofItems = proofsSnapshot.docs.map((d: any) => {
+      const data = d.data();
+      return { aiStatus: data.aiStatus, aiConfidence: data.aiConfidence };
+    });
+
+    // Fetch payment (select amount, method, proofStatus)
+    const paymentSnapshot = await db
+      .collection("payments")
+      .where("workEpisodeId", "==", epDoc.id)
+      .limit(1)
+      .get();
+    const payment = !paymentSnapshot.empty ? {
+      amount: paymentSnapshot.docs[0].data().amount,
+      method: paymentSnapshot.docs[0].data().method,
+      proofStatus: paymentSnapshot.docs[0].data().proofStatus,
+    } : null;
+
+    // Fetch confirmation
+    const confSnapshot = await db
+      .collection("merchant_confirmations")
+      .where("workEpisodeId", "==", epDoc.id)
+      .limit(1)
+      .get();
+    const confirmation = !confSnapshot.empty ? confSnapshot.docs[0].data() : null;
+
+    workEpisodes.push({
+      ...ep,
+      id: epDoc.id,
+      agent,
+      proofItems,
+      payment,
+      confirmation,
+    });
+  }
+
+  // Sort workEpisodes by createdAt desc
+  workEpisodes.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+  // Fetch confirmations
+  const confirmationsSnapshot = await db
+    .collection("merchant_confirmations")
+    .where("merchantId", "==", id)
+    .get();
+
+  const confirmations: any[] = [];
+  for (const cDoc of confirmationsSnapshot.docs) {
+    const conf = cDoc.data();
+
+    // Find matching workEpisode or fetch it
+    let workEpisode = workEpisodes.find((w) => w.id === conf.workEpisodeId);
+    if (!workEpisode) {
+      const epDoc = await db.collection("work_episodes").doc(conf.workEpisodeId).get();
+      if (epDoc.exists) {
+        const epData = epDoc.data();
+        const agentDoc = await db.collection("agent_profiles").doc(epData.agentId).get();
+        let agent = null;
+        if (agentDoc.exists) {
+          const agentData = agentDoc.data();
+          const userDoc = await db.collection("users").doc(agentData.userId).get();
+          const user = userDoc.exists ? userDoc.data() : { name: "Unknown" };
+          agent = { ...agentData, id: epData.agentId, user };
+        }
+        workEpisode = { ...epData, id: conf.workEpisodeId, agent };
+      }
+    }
+
+    if (workEpisode) {
+      confirmations.push({
+        ...conf,
+        id: cDoc.id,
+        workEpisode,
+      });
+    }
+  }
+
+  confirmations.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+
+  const merchant = {
+    ...merchantData,
+    id,
+    org,
+    workEpisodes,
+    confirmations,
+  };
+
+  const completedEpisodes = merchant.workEpisodes.filter((e: any) =>
     ["verified", "paid", "merchant_confirmed"].includes(e.status)
   );
-  const confirmedEpisodes = merchant.confirmations.filter((c) => c.confirmed);
+  const confirmedEpisodes = merchant.confirmations.filter((c: any) => c.confirmed);
   const totalPaid = merchant.workEpisodes.reduce(
-    (s, e) => s + (e.payment ? e.payment.amount : 0),
+    (s: number, e: any) => s + (e.payment ? e.payment.amount : 0),
     0
   );
-  const ratings = merchant.confirmations.filter((c) => c.rating);
+  const ratings = merchant.confirmations.filter((c: any) => c.rating);
   const avgRating =
     ratings.length > 0
-      ? ratings.reduce((s, c) => s + (c.rating || 0), 0) / ratings.length
+      ? ratings.reduce((s: number, c: any) => s + (c.rating || 0), 0) / ratings.length
       : null;
 
-  const uniqueAgents = new Set(merchant.workEpisodes.map((e) => e.agentId));
-  const agentStats = Array.from(uniqueAgents).map((agentId) => {
-    const episodes = merchant.workEpisodes.filter((e) => e.agentId === agentId);
+  const uniqueAgents = new Set(merchant.workEpisodes.map((e: any) => e.agentId));
+  const agentStats = Array.from(uniqueAgents).map((agentId: any) => {
+    const episodes = merchant.workEpisodes.filter((e: any) => e.agentId === agentId);
     const agent = episodes[0]?.agent;
     const confirmed = merchant.confirmations.filter(
-      (c) => c.workEpisode.agentId === agentId && c.confirmed
+      (c: any) => c.workEpisode.agentId === agentId && c.confirmed
     ).length;
     const agentRatings = merchant.confirmations.filter(
-      (c) => c.workEpisode.agentId === agentId && c.rating
+      (c: any) => c.workEpisode.agentId === agentId && c.rating
     );
     const agentAvgRating =
       agentRatings.length > 0
-        ? agentRatings.reduce((s, c) => s + (c.rating || 0), 0) / agentRatings.length
+        ? agentRatings.reduce((s: number, c: any) => s + (c.rating || 0), 0) / agentRatings.length
         : null;
     return { agent, episodes: episodes.length, confirmed, avgRating: agentAvgRating };
   });
@@ -109,6 +207,12 @@ export default async function MerchantDetailPage({ params }: { params: Promise<{
             Part of <span className="font-medium text-gray-600">{merchant.org.name}</span>
           </p>
         </div>
+        <Link
+          href={`/merchants/${merchant.id}/service-workspace`}
+          className="shrink-0 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors shadow-sm"
+        >
+          <Wrench className="h-4 w-4" /> Service Workspace
+        </Link>
       </div>
 
       {/* Stats */}
@@ -187,9 +291,9 @@ export default async function MerchantDetailPage({ params }: { params: Promise<{
             {merchant.workEpisodes.length === 0 && (
               <div className="px-6 py-8 text-center text-sm text-gray-400">No work episodes yet.</div>
             )}
-            {merchant.workEpisodes.map((ep) => {
+            {merchant.workEpisodes.map((ep: any) => {
               const status = getStatusBadge(ep.status);
-              const proofAccepted = ep.proofItems.filter((p) => p.aiStatus === "accepted").length;
+              const proofAccepted = ep.proofItems.filter((p: any) => p.aiStatus === "accepted").length;
               return (
                 <Link key={ep.id} href={`/work-episodes/${ep.id}`}>
                   <div className="flex items-center gap-4 px-6 py-3 hover:bg-gray-50 cursor-pointer">
@@ -225,7 +329,7 @@ export default async function MerchantDetailPage({ params }: { params: Promise<{
             <CardTitle>Feedback Given ({confirmedEpisodes.length} confirmations)</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {confirmedEpisodes.map((conf) => (
+            {confirmedEpisodes.map((conf: any) => (
               <div key={conf.id} className="rounded-lg border border-gray-200 p-4">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
