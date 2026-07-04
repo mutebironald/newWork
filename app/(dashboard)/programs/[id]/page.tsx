@@ -8,11 +8,13 @@ import { getStatusBadge, formatLocal, timeAgo } from "@/lib/utils";
 import Link from "next/link";
 import { ArrowLeft, Users, ListChecks, Wallet, Target, TrendingUp, AlertTriangle, CheckCircle2, Bot } from "lucide-react";
 import { MonitorCohortButton } from "./monitor-cohort-button";
+import { SubscribeButton } from "./subscribe-button";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProgramDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProgramDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ payment?: string }> }) {
   const { id } = await params;
+  const { payment } = await searchParams;
   const session = await getSession();
   if (!session) redirect("/login");
 
@@ -175,7 +177,28 @@ export default async function ProgramDetailPage({ params }: { params: Promise<{ 
           </div>
           <p className="text-gray-500 mt-0.5">{org.email || "No email"} · {org.country}</p>
         </div>
+        {["operator", "org_admin"].includes(session.role) && (
+          <div className="flex items-center gap-2 shrink-0">
+            {org.subscriptions[0]?.tier !== "cohort_pack" && (
+              <SubscribeButton orgId={org.id} productKey="cohort_pack" label="Subscribe · Cohort Pack ($499/mo)" />
+            )}
+            {org.subscriptions[0]?.tier !== "partner" && (
+              <SubscribeButton orgId={org.id} productKey="partner" label="Subscribe · Partner ($999/mo)" />
+            )}
+          </div>
+        )}
       </div>
+
+      {payment === "success" && (
+        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-800">
+          Payment successful — subscription updated.
+        </div>
+      )}
+      {payment === "cancelled" && (
+        <div className="rounded-lg border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm font-medium text-yellow-800">
+          Checkout cancelled — no changes were made.
+        </div>
+      )}
 
       {/* Cohorts */}
       <div className="flex items-center justify-between border-b border-gray-100 pb-3">
