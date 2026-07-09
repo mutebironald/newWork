@@ -1,0 +1,32 @@
+# Firebase App Hosting configuration
+# https://firebase.google.com/docs/app-hosting/configure
+
+runConfig:
+  minInstances: 0
+  maxInstances: 4
+
+env:
+  # Subdomain deployment (newwork.dimaggi.ai) serves from root basePath.
+  - variable: NEXT_PUBLIC_BASE_PATH
+    value: ""
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # Public origin used for Stripe success/cancel redirect URLs.
+  - variable: NEXT_PUBLIC_APP_URL
+    value: https://newwork.dimaggi.ai
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # Secrets live in Cloud Secret Manager. Create each one with:
+  #   firebase apphosting:secrets:set <NAME>
+  - variable: GEMINI_API_KEY
+    secret: GEMINI_API_KEY
+
+  - variable: STRIPE_SECRET_KEY
+    secret: STRIPE_SECRET_KEY
+
+  - variable: STRIPE_WEBHOOK_SECRET
+    secret: STRIPE_WEBHOOK_SECRET

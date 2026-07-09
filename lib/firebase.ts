@@ -3,11 +3,17 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 
-const hasFirebaseCredentials = !!(
+const hasServiceAccountCredentials = !!(
   process.env.FIREBASE_PROJECT_ID &&
   process.env.FIREBASE_CLIENT_EMAIL &&
   process.env.FIREBASE_PRIVATE_KEY
 );
+
+// Firebase App Hosting / Cloud Run set FIREBASE_CONFIG and provide Application
+// Default Credentials, so no service-account key is needed there.
+const hasAmbientCredentials = !!process.env.FIREBASE_CONFIG;
+
+const hasFirebaseCredentials = hasServiceAccountCredentials || hasAmbientCredentials;
 
 // ─── OFFLINE LOCAL FILESYSTEM EMULATOR MOCK ───────────────────────────────────
 
@@ -247,14 +253,18 @@ let storage: any;
 
 if (hasFirebaseCredentials) {
   if (!admin.apps.length) {
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-      }),
-      storageBucket: process.env.GCS_PROOF_BUCKET || `${process.env.FIREBASE_PROJECT_ID}.appspot.com`,
-    });
+    if (hasServiceAccountCredentials) {
+      admin.initializeApp({
+        credential: admin.credential.cert({
+          projectId: process.env.FIREBASE_PROJECT_ID,
+          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+          privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+        }),
+        storageBucket: process.env.GCS_PROOF_BUCKET || `${process.env.FIREBASE_PROJECT_ID}.appspot.com`,
+      });
+    } else {
+      admin.initializeApp();
+    }
   }
   db = admin.firestore();
   auth = admin.auth();
