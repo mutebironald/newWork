@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CreditCard } from "lucide-react";
 
-export function SubscribeButton({ orgId, productKey, label }: { orgId: string; productKey: "cohort_pack" | "partner"; label: string }) {
+export function SubscribeButton({ orgId, productKey, label }: { orgId?: string; productKey: string; label: string }) {
   const [loading, setLoading] = useState(false);
 
   async function subscribe() {
@@ -18,9 +18,11 @@ export function SubscribeButton({ orgId, productKey, label }: { orgId: string; p
       if (data.checkoutUrl) {
         window.location.href = data.checkoutUrl;
       } else {
+        if (data.error) alert(`Stripe Checkout Error: ${data.error}`);
         setLoading(false);
       }
-    } catch {
+    } catch (err: any) {
+      alert(`Error: ${err.message || "Failed to create checkout session"}`);
       setLoading(false);
     }
   }

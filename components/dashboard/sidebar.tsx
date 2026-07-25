@@ -17,6 +17,7 @@ import {
   LogOut,
   Building2,
   ChevronRight,
+  CreditCard,
 } from "lucide-react";
 
 const navItems = [
@@ -24,6 +25,7 @@ const navItems = [
   { href: "/agents", label: "Agents", icon: Users },
   { href: "/merchants", label: "Merchants", icon: Store },
   { href: "/programs", label: "Programs", icon: Building2 },
+  { href: "/plans", label: "Plans & Pricing", icon: CreditCard },
   { href: "/opportunities", label: "Opportunities", icon: Briefcase },
   { href: "/work-episodes", label: "Work Episodes", icon: ListChecks },
   { href: "/income", label: "Income Ledger", icon: Wallet },
