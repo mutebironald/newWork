@@ -17,6 +17,48 @@ Agents use NewWork to digitize receipts, summarize sales, prepare WhatsApp comme
 ## Who this package is for
 This package is written for the software team, product lead, design lead, AI prototyping lead, launch lead, and XPRIZE evidence lead.
 
+## Getting Started
+
+### 1. Installation
+```bash
+yarn install
+```
+
+### 2. Environment Configuration
+Copy `.env.example` to `.env` and set your credentials:
+```bash
+cp .env.example .env
+```
+Ensure `GEMINI_API_KEY`, `SESSION_SECRET`, and optional `STRIPE_SECRET_KEY` are configured.
+
+### 3. Run Development Server
+```bash
+yarn dev
+```
+Access the application at `http://localhost:3000/newwork`.
+
+---
+
+## Role Visibility Guide
+
+NewWork uses Role-Based Access Control (RBAC) to scope navigation and data privacy across 3 primary roles:
+
+| Feature / Route | Field Agent (`agent`) | Org Admin (`org_admin`) | Platform Operator (`platform_operator`) |
+| :--- | :---: | :---: | :---: |
+| **Overview** (`/overview`) | Personal Workspace | Cohort Overview | System-wide Overview |
+| **Opportunities** (`/opportunities`) | Browse & Apply | Post & Manage Jobs | Full Management |
+| **Work Episodes** (`/work-episodes`) | My Work Tasks | Cohort Tasks | System Work Episodes |
+| **Income Ledger** (`/income`) | My Earnings & Payouts | Cohort Income | Financial Control Ledger |
+| **Merchants Directory** (`/merchants`) | View Client Partners | Manage Merchants | Full Management |
+| **Agents Directory** (`/agents`) | ❌ *(Own profile only)* | View Cohort Roster | Global Talent Directory |
+| **Programs & Cohorts** (`/programs`) | ❌ Hidden | Manage Programs & Cohorts | System-wide Programs |
+| **Plans & Pricing** (`/plans`) | ❌ Hidden | Purchase SaaS Tiers | Manage Subscriptions |
+| **Impact Reports** (`/reports`) | ❌ Hidden | AI Donor/Board Reports | Full Management |
+| **AI Engine** (`/ai`) | ❌ Hidden | ❌ Hidden | Autonomous Logs & Triggers |
+| **XPRIZE Dashboard** (`/xprize`) | ❌ Hidden | ❌ Hidden | Judge Evidence Metrics |
+
+---
+
 ## Contents
 
 | Folder or file | Purpose |
