@@ -9,7 +9,7 @@ import { GenerateProfileButton } from "./generate-profile-button";
 import { EditProfileButton } from "./edit-profile-button";
 import { GenerateOffersButton } from "./generate-offers-button";
 import Link from "next/link";
-import { Wallet, Star, Bot, TrendingUp, ShieldCheck, BarChart3, Sparkles, Briefcase, DollarSign, Wrench, ArrowRight } from "lucide-react";
+import { Wallet, Star, Bot, TrendingUp, ShieldCheck, BarChart3, Sparkles, Briefcase, DollarSign, Wrench, ArrowRight, CheckCircle2 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -134,6 +134,7 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
   };
 
   const canEdit = session.id === agent.userId || session.role === "operator";
+  const canViewIncome = session.role !== "agent" || session.id === agent.userId;
 
   const skills: string[] = agent.skills ?? [];
   const aiProfile = agent.aiProfile as {
@@ -249,14 +250,23 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
 
       {/* Primary stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard title="Total Income" value={formatLocal(totalIncome)} icon={Wallet} iconColor="text-green-600" />
-        <StatCard
-          title="Last 30 Days"
-          value={formatLocal(income30d)}
-          icon={TrendingUp}
-          iconColor="text-blue-600"
-          trend={incomeGrowthPct !== null ? { value: incomeGrowthPct, label: "vs prev 30d" } : undefined}
-        />
+        {canViewIncome ? (
+          <>
+            <StatCard title="Total Income" value={formatLocal(totalIncome)} icon={Wallet} iconColor="text-green-600" />
+            <StatCard
+              title="Last 30 Days"
+              value={formatLocal(income30d)}
+              icon={TrendingUp}
+              iconColor="text-blue-600"
+              trend={incomeGrowthPct !== null ? { value: incomeGrowthPct, label: "vs prev 30d" } : undefined}
+            />
+          </>
+        ) : (
+          <>
+            <StatCard title="Completed Work" value={`${completedEpisodes.length} tasks`} icon={CheckCircle2} iconColor="text-green-600" />
+            <StatCard title="Programs Joined" value={`${agent.enrollments.length} programs`} icon={Briefcase} iconColor="text-blue-600" />
+          </>
+        )}
         <StatCard
           title="Verification Rate"
           value={`${verificationRate}%`}
@@ -274,78 +284,80 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
       </div>
 
       {/* Economic profile */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4 text-indigo-600" />
-            <CardTitle>Economic Profile</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          {/* Verification breakdown */}
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Income by Verification Level</p>
-            <div className="space-y-2">
-              {[
-                { label: "Self-Reported", value: totalIncome - verifiedIncome, color: "bg-yellow-400" },
-                { label: "Proof Uploaded", value: verifiedIncome - merchantConfirmedIncome, color: "bg-blue-400" },
-                { label: "Merchant Confirmed", value: merchantConfirmedIncome, color: "bg-green-500" },
-              ].map((row) => (
-                <div key={row.label}>
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="text-gray-600">{row.label}</span>
-                    <span className="font-medium text-gray-900">{formatLocal(Math.max(row.value, 0))}</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-gray-100">
-                    <div
-                      className={`h-2 rounded-full ${row.color}`}
-                      style={{ width: totalIncome > 0 ? `${Math.max((row.value / totalIncome) * 100, 0)}%` : "0%" }}
-                    />
-                  </div>
-                </div>
-              ))}
+      {canViewIncome && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-indigo-600" />
+              <CardTitle>Economic Profile</CardTitle>
             </div>
-          </div>
-
-          {/* Monthly income chart */}
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Monthly Income (Last 6 Months)</p>
-            <div className="flex items-end gap-2 h-24">
-              {Object.entries(monthlyBreakdown).map(([month, amount]) => {
-                const pct = maxMonthlyIncome > 0 ? (amount / maxMonthlyIncome) * 100 : 0;
-                const label = month.split("-")[1];
-                return (
-                  <div key={month} className="flex-1 flex flex-col items-center gap-1">
-                    <div className="w-full flex items-end justify-center" style={{ height: "72px" }}>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {/* Verification breakdown */}
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Income by Verification Level</p>
+              <div className="space-y-2">
+                {[
+                  { label: "Self-Reported", value: totalIncome - verifiedIncome, color: "bg-yellow-400" },
+                  { label: "Proof Uploaded", value: verifiedIncome - merchantConfirmedIncome, color: "bg-blue-400" },
+                  { label: "Merchant Confirmed", value: merchantConfirmedIncome, color: "bg-green-500" },
+                ].map((row) => (
+                  <div key={row.label}>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-gray-600">{row.label}</span>
+                      <span className="font-medium text-gray-900">{formatLocal(Math.max(row.value, 0))}</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-gray-100">
                       <div
-                        className="w-full rounded-t-sm bg-indigo-500 min-h-[2px] transition-all"
-                        style={{ height: `${Math.max(pct, 2)}%` }}
-                        title={formatLocal(amount)}
+                        className={`h-2 rounded-full ${row.color}`}
+                        style={{ width: totalIncome > 0 ? `${Math.max((row.value / totalIncome) * 100, 0)}%` : "0%" }}
                       />
                     </div>
-                    <p className="text-xs text-gray-400">{label}</p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Program enrollments */}
-          {agent.enrollments.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Programs Enrolled</p>
-              <div className="flex flex-wrap gap-2">
-                {agent.enrollments.map((e: any) => (
-                  <div key={e.id} className="rounded-lg bg-indigo-50 border border-indigo-200 px-3 py-1.5">
-                    <p className="text-xs font-medium text-indigo-800">{e.cohort.name}</p>
-                    <p className="text-xs text-indigo-500">{e.cohort.org.name}</p>
                   </div>
                 ))}
               </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
+
+            {/* Monthly income chart */}
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Monthly Income (Last 6 Months)</p>
+              <div className="flex items-end gap-2 h-24">
+                {Object.entries(monthlyBreakdown).map(([month, amount]) => {
+                  const pct = maxMonthlyIncome > 0 ? (amount / maxMonthlyIncome) * 100 : 0;
+                  const label = month.split("-")[1];
+                  return (
+                    <div key={month} className="flex-1 flex flex-col items-center gap-1">
+                      <div className="w-full flex items-end justify-center" style={{ height: "72px" }}>
+                        <div
+                          className="w-full rounded-t-sm bg-indigo-500 min-h-[2px] transition-all"
+                          style={{ height: `${Math.max(pct, 2)}%` }}
+                          title={formatLocal(amount)}
+                        />
+                      </div>
+                      <p className="text-xs text-gray-400">{label}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Program enrollments */}
+            {agent.enrollments.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Programs Enrolled</p>
+                <div className="flex flex-wrap gap-2">
+                  {agent.enrollments.map((e: any) => (
+                    <div key={e.id} className="rounded-lg bg-indigo-50 border border-indigo-200 px-3 py-1.5">
+                      <p className="text-xs font-medium text-indigo-800">{e.cohort.name}</p>
+                      <p className="text-xs text-indigo-500">{e.cohort.org.name}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* AI Career Profile */}
       {aiProfile && (

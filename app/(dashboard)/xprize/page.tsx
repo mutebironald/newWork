@@ -25,6 +25,9 @@ export const dynamic = "force-dynamic";
 export default async function XprizeDashboardPage() {
   const session = await getSession();
   if (!session) redirect("/login");
+  if (["agent", "org_admin"].includes(session.role)) {
+    redirect("/overview");
+  }
 
   const [
     agentsSnapshot,

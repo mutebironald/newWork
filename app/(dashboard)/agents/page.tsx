@@ -75,13 +75,15 @@ export default async function AgentsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Agents</h1>
           <p className="text-sm text-gray-500 mt-1">{agents.length} workers on platform</p>
         </div>
-        <Link
-          href="/register"
-          className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
-        >
-          <Users className="h-4 w-4" />
-          Add Agent
-        </Link>
+        {session.role !== "agent" && (
+          <Link
+            href="/register"
+            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
+          >
+            <Users className="h-4 w-4" />
+            Add Agent
+          </Link>
+        )}
       </div>
 
       <div className="grid gap-4">
@@ -99,6 +101,7 @@ export default async function AgentsPage() {
           ).length;
           const aiProfile = agent.aiProfile as { summary?: string } | null;
           const status = getStatusBadge(agent.status);
+          const canViewIncome = session.role !== "agent" || agent.userId === session.id;
 
           return (
             <Link key={agent.id} href={`/agents/${agent.id}`}>
@@ -141,10 +144,12 @@ export default async function AgentsPage() {
                     )}
                   </div>
                   <div className="text-right shrink-0 space-y-2">
-                    <div>
-                      <p className="text-xs text-gray-400">Total Income</p>
-                      <p className="text-sm font-bold text-green-700">{formatLocal(totalIncome)}</p>
-                    </div>
+                    {canViewIncome && (
+                      <div>
+                        <p className="text-xs text-gray-400">Total Income</p>
+                        <p className="text-sm font-bold text-green-700">{formatLocal(totalIncome)}</p>
+                      </div>
+                    )}
                     <div className="flex items-center gap-3 justify-end">
                       <div className="flex items-center gap-1 text-xs text-gray-500">
                         <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />

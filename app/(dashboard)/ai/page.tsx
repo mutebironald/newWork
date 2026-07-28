@@ -25,6 +25,9 @@ const WORKFLOW_LABELS: Record<string, string> = {
 export default async function AiEnginePage() {
   const session = await getSession();
   if (!session) redirect("/login");
+  if (["agent", "org_admin"].includes(session.role)) {
+    redirect("/overview");
+  }
 
   const [logsSnapshot, fraudSnapshot, proofsSnapshot] = await Promise.all([
     db.collection("ai_workflow_logs").get(),

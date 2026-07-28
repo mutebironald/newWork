@@ -54,6 +54,12 @@ export function Sidebar({ user }: SidebarProps) {
       ? "Organization Admin"
       : "Platform Operator";
 
+  const isOperator = !["agent", "org_admin"].includes(user.role);
+  const operatorOnlyHrefs = ["/ai", "/xprize"];
+  const visibleNavItems = navItems.filter(
+    (item) => isOperator || !operatorOnlyHrefs.includes(item.href)
+  );
+
   return (
     <div className="flex h-full w-64 flex-col bg-gray-950 text-white">
       <div className="flex h-16 items-center gap-3 px-5 border-b border-gray-800">
@@ -66,7 +72,7 @@ export function Sidebar({ user }: SidebarProps) {
 
       <nav className="flex-1 overflow-y-auto py-4 scrollbar-thin">
         <div className="space-y-0.5 px-3">
-          {navItems.map(({ href, label, icon: Icon }) => {
+          {visibleNavItems.map(({ href, label, icon: Icon }) => {
             const active = pathname.startsWith(href);
             return (
               <Link
