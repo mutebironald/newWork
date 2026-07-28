@@ -56,8 +56,10 @@ export function Sidebar({ user }: SidebarProps) {
 
   const isOperator = !["agent", "org_admin"].includes(user.role);
   const operatorOnlyHrefs = ["/ai", "/xprize"];
+  const agentHiddenHrefs = ["/plans", "/programs", "/reports"];
+
   const visibleNavItems = navItems.filter((item) => {
-    if (user.role === "agent" && item.href === "/plans") return false;
+    if (user.role === "agent" && agentHiddenHrefs.includes(item.href)) return false;
     if (!isOperator && operatorOnlyHrefs.includes(item.href)) return false;
     return true;
   });

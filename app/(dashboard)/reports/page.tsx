@@ -21,6 +21,7 @@ const reportTypeColors: Record<string, string> = {
 export default async function ReportsPage() {
   const session = await getSession();
   if (!session) redirect("/login");
+  if (session.role === "agent") redirect("/overview");
 
   const [reportsSnapshot, orgsSnapshot] = await Promise.all([
     db.collection("impact_reports").get(),

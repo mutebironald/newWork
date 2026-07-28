@@ -12,6 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function ProgramsPage() {
   const session = await getSession();
   if (!session) redirect("/login");
+  if (session.role === "agent") redirect("/overview");
 
   const orgsSnapshot = await db.collection("organizations").get();
   const orgs: any[] = [];
