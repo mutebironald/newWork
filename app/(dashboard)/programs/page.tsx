@@ -129,14 +129,16 @@ export default async function ProgramsPage() {
                       <Badge className="text-gray-600 bg-gray-100 border-gray-200 capitalize">
                         {org.type}
                       </Badge>
-                      {activeSub ? (
-                        <Badge className="text-green-700 bg-green-50 border-green-200 capitalize">
-                          {activeSub.tier} · ${activeSub.priceUsd}/mo
-                        </Badge>
-                      ) : (
-                        <Badge className="text-gray-500 bg-gray-50 border-gray-200">
-                          Free tier
-                        </Badge>
+                      {session.role !== "agent" && (
+                        activeSub ? (
+                          <Badge className="text-green-700 bg-green-50 border-green-200 capitalize">
+                            {activeSub.tier} · ${activeSub.priceUsd}/mo
+                          </Badge>
+                        ) : (
+                          <Badge className="text-gray-500 bg-gray-50 border-gray-200">
+                            Free tier
+                          </Badge>
+                        )
                       )}
                     </div>
                     <p className="text-sm text-gray-500">{org.email || "No email"} · {org.country}</p>

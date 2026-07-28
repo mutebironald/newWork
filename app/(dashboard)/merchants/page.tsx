@@ -68,7 +68,7 @@ export default async function MerchantsPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Merchants</h1>
         <p className="text-sm text-gray-500 mt-1">
-          {merchants.length} businesses · Merchant pays agent directly — platform is SaaS only
+          {merchants.length} active business partners hiring field agents
         </p>
       </div>
 

@@ -85,13 +85,15 @@ export default async function OpportunitiesPage() {
             {opportunities.filter((o) => o.status === "open").length} open opportunities
           </p>
         </div>
-        <Link
-          href="/opportunities/new"
-          className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          Create Opportunity
-        </Link>
+        {session.role !== "agent" && (
+          <Link
+            href="/opportunities/new"
+            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Create Opportunity
+          </Link>
+        )}
       </div>
 
       {opportunities.length === 0 && (
