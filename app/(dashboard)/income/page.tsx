@@ -14,8 +14,13 @@ export default async function IncomePage() {
   if (!session) redirect("/login");
 
   const ledgerSnapshot = await db.collection("income_ledger").get();
+  let docs = ledgerSnapshot.docs;
+  if (session.role === "agent" && session.agentId) {
+    docs = docs.filter((doc: any) => doc.data().agentId === session.agentId);
+  }
+
   const ledger: any[] = [];
-  for (const doc of ledgerSnapshot.docs) {
+  for (const doc of docs) {
     const entry = doc.data();
 
     // Fetch agent profile
@@ -82,21 +87,28 @@ export default async function IncomePage() {
 
   const uniqueAgents = new Set(ledger.map((l: any) => l.agentId)).size;
   const avgPerAgent = uniqueAgents > 0 ? Math.round(totalIncome / uniqueAgents) : 0;
+  const isAgent = session.role === "agent";
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Income Ledger</h1>
+        <h1 className="text-2xl font-bold text-gray-900">
+          {isAgent ? "My Income Ledger" : "Income Ledger"}
+        </h1>
         <p className="text-sm text-gray-500 mt-1">
           All income is agent-earned. Platform does not handle agent funds — merchant pays agent directly.
         </p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard title="Total Income Generated" value={formatLocal(totalIncome)} icon={Wallet} iconColor="text-green-600" />
+        <StatCard title={isAgent ? "My Total Income" : "Total Income Generated"} value={formatLocal(totalIncome)} icon={Wallet} iconColor="text-green-600" />
         <StatCard title="Verified Income (proof+)" value={formatLocal(verifiedIncome)} icon={CheckCircle2} iconColor="text-teal-600" />
         <StatCard title="Merchant-Confirmed" value={formatLocal(merchantConfirmedIncome)} subtitle="North-star metric" icon={TrendingUp} iconColor="text-indigo-600" />
-        <StatCard title="Avg per Agent" value={formatLocal(avgPerAgent)} icon={Users} iconColor="text-purple-600" subtitle={`${uniqueAgents} active agents`} />
+        {isAgent ? (
+          <StatCard title="Ledger Entries" value={`${ledger.length}`} icon={Users} iconColor="text-purple-600" subtitle="Total payout records" />
+        ) : (
+          <StatCard title="Avg per Agent" value={formatLocal(avgPerAgent)} icon={Users} iconColor="text-purple-600" subtitle={`${uniqueAgents} active agents`} />
+        )}
       </div>
 
       {/* Verification breakdown */}

@@ -91,14 +91,16 @@ export default async function ProgramsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Organizations & Programs</h1>
-          <p className="text-sm text-gray-500 mt-1">{orgs.length} organizations · Revenue from org subscriptions (not agent fees)</p>
+          <p className="text-sm text-gray-500 mt-1">{orgs.length} active workforce organizations</p>
         </div>
-        <Link
-          href="/programs/new"
-          className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
-        >
-          <Plus className="h-4 w-4" /> New Organization
-        </Link>
+        {session.role !== "agent" && (
+          <Link
+            href="/programs/new"
+            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
+          >
+            <Plus className="h-4 w-4" /> New Organization
+          </Link>
+        )}
       </div>
 
       {orgs.length === 0 && (

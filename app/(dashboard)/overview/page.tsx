@@ -23,6 +23,8 @@ export default async function OverviewPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
+  const isAgent = session.role === "agent";
+
   const [
     agentsSnapshot,
     merchantsSnapshot,
@@ -66,18 +68,21 @@ export default async function OverviewPage() {
   const autonomousLogs = autonomousSnapshot.size;
   const aiAutonomyRate = aiLogs > 0 ? Math.round((autonomousLogs / aiLogs) * 100) : 0;
 
-  // Build the recentEpisodes array
+  // Build allEpisodes array
   const allEpisodes = recentEpisodesSnapshot.docs.map((doc: any) => ({
     ...doc.data(),
     id: doc.id,
   }));
-  // Sort by createdAt desc
   allEpisodes.sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-  const selectedEpisodes = allEpisodes.slice(0, 8);
+
+  // Filter episodes for display
+  const displayEpisodesList = isAgent
+    ? allEpisodes.filter((ep: any) => ep.agentId === session.agentId)
+    : allEpisodes;
+  const selectedEpisodes = displayEpisodesList.slice(0, 8);
 
   const recentEpisodes: any[] = [];
   for (const ep of selectedEpisodes) {
-    // Fetch agent profile
     const agentDoc = await db.collection("agent_profiles").doc(ep.agentId).get();
     let agent = null;
     if (agentDoc.exists) {
@@ -89,7 +94,6 @@ export default async function OverviewPage() {
       agent = { user: { name: "Unknown" } };
     }
 
-    // Fetch merchant
     let merchant = null;
     if (ep.merchantId) {
       const merchantDoc = await db.collection("merchants").doc(ep.merchantId).get();
@@ -103,11 +107,22 @@ export default async function OverviewPage() {
     });
   }
 
+  // Agent specific metrics
+  const agentEpisodes = allEpisodes.filter((e: any) => e.agentId === session.agentId);
+  const agentIncome = ledgerSnapshot.docs
+    .filter((d: any) => d.data().agentId === session.agentId)
+    .reduce((sum: number, d: any) => sum + (d.data().amount || 0), 0);
+  const agentVerifiedCount = agentEpisodes.filter((e: any) =>
+    ["verified", "paid", "merchant_confirmed"].includes(e.status)
+  ).length;
+
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Platform Overview</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {isAgent ? "Agent Workspace" : "Platform Overview"}
+          </h1>
           <p className="text-sm text-gray-500 mt-1">
             Welcome back, {session.name}
           </p>
@@ -119,101 +134,135 @@ export default async function OverviewPage() {
       </div>
 
       {/* Primary metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard
-          title="Active Agents"
-          value={totalAgents.toLocaleString()}
-          icon={Users}
-          iconColor="text-indigo-600"
-          subtitle="Workers on platform"
-        />
-        <StatCard
-          title="Active Merchants"
-          value={totalMerchants.toLocaleString()}
-          icon={Store}
-          iconColor="text-purple-600"
-          subtitle="Businesses served"
-        />
-        <StatCard
-          title="Work Episodes"
-          value={totalEpisodes.toLocaleString()}
-          icon={ListChecks}
-          iconColor="text-blue-600"
-          subtitle={`${verifiedEpisodes} verified`}
-        />
-        <StatCard
-          title="Total Income Generated"
-          value={formatLocal(totalIncomeAmt)}
-          icon={Wallet}
-          iconColor="text-green-600"
-          subtitle="Agent-earned income"
-        />
-      </div>
-
-      {/* AI + verification metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard
-          title="AI Decisions Made"
-          value={aiLogs.toLocaleString()}
-          icon={Bot}
-          iconColor="text-violet-600"
-          subtitle={`${aiAutonomyRate}% autonomous`}
-        />
-        <StatCard
-          title="Merchant Confirmed"
-          value={merchantConfirmed.toLocaleString()}
-          icon={CheckCircle2}
-          iconColor="text-teal-600"
-          subtitle="Work confirmed by merchants"
-        />
-        <StatCard
-          title="Open Opportunities"
-          value={openOpportunities.toLocaleString()}
-          icon={TrendingUp}
-          iconColor="text-orange-600"
-          subtitle="Awaiting assignment"
-        />
-        <StatCard
-          title="Fraud Flags"
-          value={fraudFlags.toLocaleString()}
-          icon={AlertTriangle}
-          iconColor={fraudFlags > 0 ? "text-red-600" : "text-gray-400"}
-          subtitle="Unresolved flags"
-        />
-      </div>
-
-      {/* AI Autonomy rate callout */}
-      <div className="rounded-xl border border-violet-200 bg-gradient-to-r from-violet-50 to-indigo-50 p-5">
-        <div className="flex items-start gap-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-100 shrink-0">
-            <Bot className="h-5 w-5 text-violet-600" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-sm font-semibold text-violet-900">AI-Native Operations</h3>
-            <p className="text-sm text-violet-700 mt-1">
-              {aiAutonomyRate}% of operational decisions are made autonomously by AI — proof
-              verification, opportunity matching, fraud detection, and cohort health monitoring all
-              run without human intervention.
-            </p>
-          </div>
-          <div className="text-right shrink-0">
-            <div className="text-2xl font-bold text-violet-700">{aiAutonomyRate}%</div>
-            <div className="text-xs text-violet-500">AI autonomy rate</div>
-          </div>
-        </div>
-        <div className="mt-4 h-2 rounded-full bg-violet-100">
-          <div
-            className="h-2 rounded-full bg-violet-500 transition-all"
-            style={{ width: `${aiAutonomyRate}%` }}
+      {isAgent ? (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <StatCard
+            title="Available Opportunities"
+            value={openOpportunities.toLocaleString()}
+            icon={TrendingUp}
+            iconColor="text-indigo-600"
+            subtitle="Browse open jobs"
+          />
+          <StatCard
+            title="My Earned Income"
+            value={formatLocal(agentIncome)}
+            icon={Wallet}
+            iconColor="text-green-600"
+            subtitle="Total verified payouts"
+          />
+          <StatCard
+            title="My Work Episodes"
+            value={agentEpisodes.length.toLocaleString()}
+            icon={ListChecks}
+            iconColor="text-blue-600"
+            subtitle={`${agentVerifiedCount} verified`}
+          />
+          <StatCard
+            title="Active Merchants"
+            value={totalMerchants.toLocaleString()}
+            icon={Store}
+            iconColor="text-purple-600"
+            subtitle="Clients hiring"
           />
         </div>
-      </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StatCard
+              title="Active Agents"
+              value={totalAgents.toLocaleString()}
+              icon={Users}
+              iconColor="text-indigo-600"
+              subtitle="Workers on platform"
+            />
+            <StatCard
+              title="Active Merchants"
+              value={totalMerchants.toLocaleString()}
+              icon={Store}
+              iconColor="text-purple-600"
+              subtitle="Businesses served"
+            />
+            <StatCard
+              title="Work Episodes"
+              value={totalEpisodes.toLocaleString()}
+              icon={ListChecks}
+              iconColor="text-blue-600"
+              subtitle={`${verifiedEpisodes} verified`}
+            />
+            <StatCard
+              title="Total Income Generated"
+              value={formatLocal(totalIncomeAmt)}
+              icon={Wallet}
+              iconColor="text-green-600"
+              subtitle="Agent-earned income"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StatCard
+              title="AI Decisions Made"
+              value={aiLogs.toLocaleString()}
+              icon={Bot}
+              iconColor="text-violet-600"
+              subtitle={`${aiAutonomyRate}% autonomous`}
+            />
+            <StatCard
+              title="Merchant Confirmed"
+              value={merchantConfirmed.toLocaleString()}
+              icon={CheckCircle2}
+              iconColor="text-teal-600"
+              subtitle="Work confirmed by merchants"
+            />
+            <StatCard
+              title="Open Opportunities"
+              value={openOpportunities.toLocaleString()}
+              icon={TrendingUp}
+              iconColor="text-orange-600"
+              subtitle="Awaiting assignment"
+            />
+            <StatCard
+              title="Fraud Flags"
+              value={fraudFlags.toLocaleString()}
+              icon={AlertTriangle}
+              iconColor={fraudFlags > 0 ? "text-red-600" : "text-gray-400"}
+              subtitle="Unresolved flags"
+            />
+          </div>
+
+          {/* AI Autonomy rate callout */}
+          <div className="rounded-xl border border-violet-200 bg-gradient-to-r from-violet-50 to-indigo-50 p-5">
+            <div className="flex items-start gap-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-100 shrink-0">
+                <Bot className="h-5 w-5 text-violet-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-violet-900">AI-Native Operations</h3>
+                <p className="text-sm text-violet-700 mt-1">
+                  {aiAutonomyRate}% of operational decisions are made autonomously by AI — proof
+                  verification, opportunity matching, fraud detection, and cohort health monitoring all
+                  run without human intervention.
+                </p>
+              </div>
+              <div className="text-right shrink-0">
+                <div className="text-2xl font-bold text-violet-700">{aiAutonomyRate}%</div>
+                <div className="text-xs text-violet-500">AI autonomy rate</div>
+              </div>
+            </div>
+            <div className="mt-4 h-2 rounded-full bg-violet-100">
+              <div
+                className="h-2 rounded-full bg-violet-500 transition-all"
+                style={{ width: `${aiAutonomyRate}%` }}
+              />
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Recent work episodes */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Recent Work Episodes</CardTitle>
+            <CardTitle>{isAgent ? "My Recent Work Episodes" : "Recent Work Episodes"}</CardTitle>
             <Link href="/work-episodes" className="text-xs text-indigo-600 hover:text-indigo-500 font-medium">
               View all →
             </Link>
@@ -223,7 +272,7 @@ export default async function OverviewPage() {
           <div className="divide-y divide-gray-100">
             {recentEpisodes.length === 0 && (
               <div className="px-6 py-8 text-center text-sm text-gray-400">
-                No work episodes yet. <Link href="/opportunities" className="text-indigo-600">Browse opportunities</Link>
+                No work episodes yet. <Link href="/opportunities" className="text-indigo-600 font-medium">Browse opportunities</Link>
               </div>
             )}
             {recentEpisodes.map((ep) => {

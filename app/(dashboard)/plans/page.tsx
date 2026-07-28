@@ -16,6 +16,7 @@ export default async function PlansDashboardPage({
   const { payment, product } = await searchParams;
   const session = await getSession();
   if (!session) redirect("/login");
+  if (session.role === "agent") redirect("/overview");
 
   // Fetch current user organization if any
   let userOrg: any = null;

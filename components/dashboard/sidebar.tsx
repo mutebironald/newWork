@@ -56,9 +56,11 @@ export function Sidebar({ user }: SidebarProps) {
 
   const isOperator = !["agent", "org_admin"].includes(user.role);
   const operatorOnlyHrefs = ["/ai", "/xprize"];
-  const visibleNavItems = navItems.filter(
-    (item) => isOperator || !operatorOnlyHrefs.includes(item.href)
-  );
+  const visibleNavItems = navItems.filter((item) => {
+    if (user.role === "agent" && item.href === "/plans") return false;
+    if (!isOperator && operatorOnlyHrefs.includes(item.href)) return false;
+    return true;
+  });
 
   return (
     <div className="flex h-full w-64 flex-col bg-gray-950 text-white">

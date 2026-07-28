@@ -21,8 +21,13 @@ export default async function WorkEpisodesPage() {
   if (!session) redirect("/login");
 
   const episodesSnapshot = await db.collection("work_episodes").get();
+  let docs = episodesSnapshot.docs;
+  if (session.role === "agent" && session.agentId) {
+    docs = docs.filter((doc: any) => doc.data().agentId === session.agentId);
+  }
+
   const episodes: any[] = [];
-  for (const doc of episodesSnapshot.docs) {
+  for (const doc of docs) {
     const ep = doc.data();
 
     // Fetch agent profile
