@@ -61,14 +61,18 @@ export default async function ReportsPage() {
   // Sort by generatedAt desc
   reports.sort((a, b) => new Date(b.generatedAt || 0).getTime() - new Date(a.generatedAt || 0).getTime());
 
+  const isAgent = session.role === "agent";
+
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Impact Reports</h1>
-          <p className="text-sm text-gray-500 mt-1">AI-generated donor, board, and cohort reports</p>
+          <p className="text-sm text-gray-500 mt-1">
+            {isAgent ? "Community and program impact reports" : "AI-generated donor, board, and cohort reports"}
+          </p>
         </div>
-        <GenerateReportButton orgs={orgs} />
+        {!isAgent && <GenerateReportButton orgs={orgs} />}
       </div>
 
       {reports.length === 0 && (

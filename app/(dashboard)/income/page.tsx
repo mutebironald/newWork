@@ -96,14 +96,16 @@ export default async function IncomePage() {
           {isAgent ? "My Income Ledger" : "Income Ledger"}
         </h1>
         <p className="text-sm text-gray-500 mt-1">
-          All income is agent-earned. Platform does not handle agent funds — merchant pays agent directly.
+          {isAgent
+            ? "Track your verified task payments and payout records."
+            : "All income is agent-earned. Platform does not handle agent funds — merchant pays agent directly."}
         </p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard title={isAgent ? "My Total Income" : "Total Income Generated"} value={formatLocal(totalIncome)} icon={Wallet} iconColor="text-green-600" />
         <StatCard title="Verified Income (proof+)" value={formatLocal(verifiedIncome)} icon={CheckCircle2} iconColor="text-teal-600" />
-        <StatCard title="Merchant-Confirmed" value={formatLocal(merchantConfirmedIncome)} subtitle="North-star metric" icon={TrendingUp} iconColor="text-indigo-600" />
+        <StatCard title="Merchant-Confirmed" value={formatLocal(merchantConfirmedIncome)} subtitle={isAgent ? "Confirmed task payouts" : "North-star metric"} icon={TrendingUp} iconColor="text-indigo-600" />
         {isAgent ? (
           <StatCard title="Ledger Entries" value={`${ledger.length}`} icon={Users} iconColor="text-purple-600" subtitle="Total payout records" />
         ) : (

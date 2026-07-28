@@ -326,9 +326,13 @@ export default async function OverviewPage() {
                   <p className="text-xs font-semibold">{badge.label}</p>
                   <p className="text-xs mt-1 opacity-70">
                     {rung.level === "merchant_confirmed"
-                      ? "North-star metric"
+                      ? isAgent
+                        ? "Merchant Verified"
+                        : "North-star metric"
                       : rung.level === "program_verified"
-                      ? "XPRIZE target"
+                      ? isAgent
+                        ? "Fully Verified"
+                        : "XPRIZE target"
                       : ""}
                   </p>
                 </div>
@@ -336,8 +340,9 @@ export default async function OverviewPage() {
             })}
           </div>
           <p className="text-xs text-gray-400 mt-3">
-            North-star count: work episodes reaching <strong>merchant_confirmed</strong> or higher.
-            Merchant confirmation is the default rung for verified income.
+            {isAgent
+              ? "Income verification progresses from self-reported uploads to merchant confirmation and program verification."
+              : "North-star count: work episodes reaching merchant_confirmed or higher. Merchant confirmation is the default rung for verified income."}
           </p>
         </CardContent>
       </Card>
