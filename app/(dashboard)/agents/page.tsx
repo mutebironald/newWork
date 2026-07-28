@@ -11,6 +11,10 @@ export const dynamic = "force-dynamic";
 export default async function AgentsPage() {
   const session = await getSession();
   if (!session) redirect("/login");
+  if (session.role === "agent") {
+    if (session.agentId) redirect(`/agents/${session.agentId}`);
+    redirect("/overview");
+  }
 
   const agentsSnapshot = await db.collection("agent_profiles").get();
   const agents: any[] = [];

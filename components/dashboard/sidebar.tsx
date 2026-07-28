@@ -35,7 +35,7 @@ const navItems = [
 ];
 
 interface SidebarProps {
-  user: { name: string; email: string; role: string };
+  user: { name: string; email: string; role: string; agentId?: string };
 }
 
 export function Sidebar({ user }: SidebarProps) {
@@ -56,7 +56,7 @@ export function Sidebar({ user }: SidebarProps) {
 
   const isOperator = !["agent", "org_admin"].includes(user.role);
   const operatorOnlyHrefs = ["/ai", "/xprize"];
-  const agentHiddenHrefs = ["/plans", "/programs", "/reports"];
+  const agentHiddenHrefs = ["/plans", "/programs", "/reports", "/agents"];
 
   const visibleNavItems = navItems.filter((item) => {
     if (user.role === "agent" && agentHiddenHrefs.includes(item.href)) return false;
@@ -99,15 +99,30 @@ export function Sidebar({ user }: SidebarProps) {
       </nav>
 
       <div className="border-t border-gray-800 p-4">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600 text-white text-xs font-bold shrink-0">
-            {user.name.charAt(0).toUpperCase()}
+        {user.agentId ? (
+          <Link
+            href={`/agents/${user.agentId}`}
+            className="flex items-center gap-3 mb-3 p-1.5 rounded-lg hover:bg-gray-800 transition-colors group cursor-pointer"
+          >
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600 text-white text-xs font-bold shrink-0">
+              {user.name.charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-white truncate group-hover:text-indigo-300 transition-colors">{user.name}</p>
+              <p className="text-xs text-gray-400 truncate">{roleLabel} · Profile</p>
+            </div>
+          </Link>
+        ) : (
+          <div className="flex items-center gap-3 mb-3 p-1.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600 text-white text-xs font-bold shrink-0">
+              {user.name.charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-white truncate">{user.name}</p>
+              <p className="text-xs text-gray-400 truncate">{roleLabel}</p>
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-white truncate">{user.name}</p>
-            <p className="text-xs text-gray-400 truncate">{roleLabel}</p>
-          </div>
-        </div>
+        )}
         <button
           onClick={logout}
           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-400 hover:bg-gray-800 hover:text-white transition-colors"
